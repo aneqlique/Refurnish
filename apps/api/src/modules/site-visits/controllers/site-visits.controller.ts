@@ -1,0 +1,101 @@
+import { Request, Response } from "express";
+import SiteVisit, { ISiteVisit } from "../models/site-visits.model";
+
+// Track a site visit
+export const trackVisit = async (req: Request, res: Response) => {
+  try {
+    const { page, referrer } = req.body;
+    const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+    const userAgent = req.get('User-Agent') || 'unknown';
+    const userId = req.user?._id;
+
+    const visit = new SiteVisit({
+      ipAddress,
+      userAgent,
+      page,
+      referrer,
+      userId
+    });
+
+    await visit.save();
+
+    res.status(201).json({ message: "Visit tracked successfully" });
+  } catch (error) {
+    console.error("Error tracking visit:", error);
+    res.status(500).json({ error: "Failed to track visit" });
+  }
+};
+
+// Get total site visits count
+export const getTotalVisits = async (req: Request, res: Response) => {
+  try {
+    const totalVisits = await SiteVisit.countDocuments();
+    
+    res.status(200).json({ 
+      totalVisits,
+      message: "Total visits retrieved successfully" 
+    });
+  } catch (error) {
+    console.error("Error getting total visits:", error);
+    res.status(500).json({ error: "Failed to get total visits" });
+  }
+};
+
+// Get site visits with pagination and optional filters
+export const getVisits = async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(parseInt((req.query.page as string) || "1", 10), 1);
+    const limit = Math.min(
+      Math.max(parseInt((req.query.limit as string) || "10", 10), 1),
+      100
+    );
+    const search = ((req.query.search as string) || "").trim();
+
+    const filter: any = {};
+    if (search) {
+      filter.$or = [
+        { page: { $regex: search, $options: "i" } },
+        { ipAddress: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [total, visits] = await Promise.all([
+      SiteVisit.countDocuments(filter),
+      SiteVisit.find(filter)
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('userId', 'firstName lastName email')
+        .lean(),
+    ]);
+
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
+    const data = visits.map((visit: any) => ({
+      _id: visit._id,
+      ipAddress: visit.ipAddress,
+      page: visit.page,
+      referrer: visit.referrer,
+      timestamp: visit.timestamp,
+      user: visit.userId ? {
+        name: [visit.userId.firstName, visit.userId.lastName].filter(Boolean).join(" ").trim(),
+        email: visit.userId.email
+      } : null
+    }));
+
+    return res.status(200).json({
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting visits:", error);
+    return res.status(500).json({ error: "Failed to fetch visits" });
+  }
+};

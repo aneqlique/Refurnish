@@ -1,10 +1,9 @@
 "use client";
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Users, TrendingUp, ShoppingBag, Clock, Menu } from 'lucide-react';
 import { Montserrat } from 'next/font/google';
-import { useRouter } from 'next/navigation';
 import { LogOut, LayoutDashboard, PackageCheck } from "lucide-react";
 import { useAuth } from '../../../contexts/AuthContext';
 import {
@@ -23,11 +22,9 @@ const montserrat = Montserrat({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
 });
-const navItems = [
-  { label: 'Dashboard Overview', href: '/admin/dashboard', active: true, icon: <LayoutDashboard className="w-5 h-5 text-gray-500" /> },
-  { label: 'User Management', href: '/admin/user-management', active: false, icon: <Users className="w-5 h-5 text-gray-500" /> },
-  { label: 'Product Moderation', href: '/admin/product-moderation', active: false, icon: <PackageCheck className="w-5 h-5 text-gray-500" /> },
-];
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://refurnish-backend.onrender.com';
+
 interface StatCard {
   title: string;
   value: string;
@@ -36,17 +33,72 @@ interface StatCard {
   bgColor: string;
 }
 
-interface Order {
-  orderId: string;
-  paymentMethod: string;
-  orderDate: string;
-  status: string;
-  total: string;
-}
-
 const AdminDashboard: React.FC = () => {
-  const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
+  const [userCount, setUserCount] = useState<number>(0);
+  const [isLoadingUserCount, setIsLoadingUserCount] = useState(true);
+  const [siteVisitsCount, setSiteVisitsCount] = useState<number>(0);
+  const [isLoadingSiteVisits, setIsLoadingSiteVisits] = useState(true);
+
+  // Function to fetch user count
+  const fetchUserCount = useCallback(async () => {
+    try {
+      setIsLoadingUserCount(true);
+      const response = await fetch(`${API_BASE_URL}/api/users?limit=1`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user count');
+      }
+
+      const data = await response.json();
+      setUserCount(data.pagination.total);
+    } catch (error) {
+      console.error('Error fetching user count:', error);
+      // Keep the default value of 0 if fetch fails
+    } finally {
+      setIsLoadingUserCount(false);
+    }
+  }, [token]);
+
+  // Function to fetch site visits count
+  const fetchSiteVisitsCount = useCallback(async () => {
+    try {
+      setIsLoadingSiteVisits(true);
+      const response = await fetch(`${API_BASE_URL}/api/site-visits/total`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch site visits count');
+      }
+
+      const data = await response.json();
+      setSiteVisitsCount(data.totalVisits);
+    } catch (error) {
+      console.error('Error fetching site visits count:', error);
+      // Keep the default value of 0 if fetch fails
+    } finally {
+      setIsLoadingSiteVisits(false);
+    }
+  }, [token]);
+
+  // Fetch user count and site visits count on component mount
+  useEffect(() => {
+    if (token) {
+      fetchUserCount();
+      fetchSiteVisitsCount();
+    }
+  }, [token, fetchUserCount, fetchSiteVisitsCount]);
 
   const navItems = [
    { label: 'Dashboard Overview', href: '/admin/dashboard', active: true, icon: <LayoutDashboard className="w-5 h-5 text-gray-500" /> },
@@ -55,16 +107,10 @@ const AdminDashboard: React.FC = () => {
 ];
 
   const stats: StatCard[] = [
-    { title: "Users", value: "123", icon: <Users className="w-5 h-5" />, color: "text-purple-600", bgColor: "bg-purple-100" },
-    { title: "Site Visits", value: "1m", icon: <TrendingUp className="w-5 h-5" />, color: "text-green-600", bgColor: "bg-green-100" },
+    { title: "Users", value: isLoadingUserCount ? "..." : userCount.toString(), icon: <Users className="w-5 h-5" />, color: "text-purple-600", bgColor: "bg-purple-100" },
+    { title: "Site Visits", value: isLoadingSiteVisits ? "..." : siteVisitsCount.toString(), icon: <TrendingUp className="w-5 h-5" />, color: "text-green-600", bgColor: "bg-green-100" },
     { title: "Sales", value: "₱100K", icon: <ShoppingBag className="w-5 h-5" />, color: "text-red-600", bgColor: "bg-red-100" },
     { title: "Pending Orders", value: "68", icon: <Clock className="w-5 h-5" />, color: "text-blue-600", bgColor: "bg-blue-100" }
-  ];
-
-  const recentOrders: Order[] = [
-    { orderId: "123456789101", paymentMethod: "Cash", orderDate: "September 11, 2025", status: "Shipping", total: "₱1500" },
-    { orderId: "123456789102", paymentMethod: "Gcash", orderDate: "September 12, 2025", status: "Pending", total: "₱2000" },
-    { orderId: "123456789103", paymentMethod: "Card", orderDate: "September 13, 2025", status: "Delivered", total: "₱500" }
   ];
 
   const chartData = [
@@ -77,9 +123,7 @@ const AdminDashboard: React.FC = () => {
     { name: "Sun", sales: 3490, visits: 4300 }
   ];
 
-  const handleEdit = (orderId: string) => console.log(`Edit order: ${orderId}`);
-  const handleDelete = (orderId: string) => console.log(`Delete order: ${orderId}`);
-
+  // Logout
   const handleLogout = () => {
     logout();
   };
@@ -101,9 +145,11 @@ const AdminDashboard: React.FC = () => {
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 bg-[#636B2F] rounded-full flex items-center justify-center overflow-hidden">
               {user?.profilePicture ? (
-                <img 
+                <Image 
                   src={user.profilePicture} 
                   alt={`${user.firstName} ${user.lastName}`}
+                  width={48}
+                  height={48}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     // Fallback to initials if image fails to load
@@ -195,54 +241,7 @@ const AdminDashboard: React.FC = () => {
           ))}
         </div>
       </div>
-        {/* Recent Orders + Graphs */}
-        {/* <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Table * /}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
-              <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                View All
-              </button>
-            </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {recentOrders.map((order, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.orderId}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.paymentMethod}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.orderDate}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 text-xs font-medium text-orange-800 bg-orange-100 rounded-full">
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.total}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center space-x-3">
-                          <button onClick={() => handleDelete(order.orderId)} className="text-red-600 hover:text-red-900">Delete</button>
-                          <button onClick={() => handleEdit(order.orderId)} className="text-blue-600 hover:text-blue-900">Edit</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-            */}
 
           {/* Graphs */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
