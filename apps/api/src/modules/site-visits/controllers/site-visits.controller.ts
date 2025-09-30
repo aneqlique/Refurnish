@@ -1,12 +1,19 @@
 import { Request, Response } from "express";
 import SiteVisit, { ISiteVisit } from "../models/site-visits.model";
+import { getPhilippinesTime } from "../../utils/timezone";
 
 // Track a site visit
 export const trackVisit = async (req: Request, res: Response) => {
   try {
-    const { page, referrer } = req.body;
+    const { page, referrer, userAgent: bodyUserAgent, timestamp } = req.body;
+    
+    // Validate required fields
+    if (!page) {
+      return res.status(400).json({ error: "Page is required" });
+    }
+
     const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
-    const userAgent = req.get('User-Agent') || 'unknown';
+    const userAgent = bodyUserAgent || req.get('User-Agent') || 'unknown';
     const userId = req.user?._id;
 
     const visit = new SiteVisit({
@@ -14,7 +21,8 @@ export const trackVisit = async (req: Request, res: Response) => {
       userAgent,
       page,
       referrer,
-      userId
+      userId,
+      timestamp: timestamp ? new Date(timestamp) : getPhilippinesTime()
     });
 
     await visit.save();
