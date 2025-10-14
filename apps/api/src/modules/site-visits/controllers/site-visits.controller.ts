@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import SiteVisit, { ISiteVisit } from "../models/site-visits.model";
-import { getPhilippinesTime } from "../../utils/timezone";
 
 // Track a site visit
 export const trackVisit = async (req: Request, res: Response) => {
@@ -16,13 +15,13 @@ export const trackVisit = async (req: Request, res: Response) => {
     const userAgent = bodyUserAgent || req.get('User-Agent') || 'unknown';
     const userId = req.user?._id;
 
-    const visit = new SiteVisit({
+    const visit = new SiteVisit({  
       ipAddress,
       userAgent,
       page,
       referrer,
       userId,
-      timestamp: timestamp ? new Date(timestamp) : getPhilippinesTime()
+      timestamp: timestamp ? new Date(timestamp) : new Date()
     });
 
     await visit.save();

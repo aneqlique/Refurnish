@@ -9,7 +9,7 @@ export interface IProduct extends Document {
   images: string[];
   location: string;
   owner: mongoose.Schema.Types.ObjectId;
-  status: "for_sale" | "for_swap" | "both"; // New field for sale or swap logic
+  status: "for_sale" | "for_swap" | "both" | "sold"; // New field for sale or swap logic
 }
 
 const ProductSchema: Schema = new Schema({
@@ -24,8 +24,10 @@ const ProductSchema: Schema = new Schema({
   status: {
     type: String,
     required: true,
-    enum: ["for_sale", "for_swap", "both"],
+    enum: ["for_sale", "for_swap", "both", "sold"],
   },
+}, {
+  timestamps: true
 });
 
 export default mongoose.model<IProduct>("Product", ProductSchema);

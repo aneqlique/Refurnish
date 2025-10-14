@@ -39,6 +39,18 @@ const AdminDashboard: React.FC = () => {
   const [isLoadingUserCount, setIsLoadingUserCount] = useState(true);
   const [siteVisitsCount, setSiteVisitsCount] = useState<number>(0);
   const [isLoadingSiteVisits, setIsLoadingSiteVisits] = useState(true);
+  const [totalSales, setTotalSales] = useState<number>(0);
+  const [isLoadingSales, setIsLoadingSales] = useState(true);
+  const [weeklyChartData, setWeeklyChartData] = useState<Array<{ name: string; sales: number; visits: number }>>([
+    { name: "Mon", sales: 0, visits: 0 },
+    { name: "Tue", sales: 0, visits: 0 },
+    { name: "Wed", sales: 0, visits: 0 },
+    { name: "Thu", sales: 0, visits: 0 },
+    { name: "Fri", sales: 0, visits: 0 },
+    { name: "Sat", sales: 0, visits: 0 },
+    { name: "Sun", sales: 0, visits: 0 },
+  ]);
+  const [analyticsRangeLabel, setAnalyticsRangeLabel] = useState<string>("");
 
   // Function to fetch user count
   const fetchUserCount = useCallback(async () => {
@@ -92,13 +104,76 @@ const AdminDashboard: React.FC = () => {
     }
   }, [token]);
 
-  // Fetch user count and site visits count on component mount
+  // Function to fetch total sales
+  const fetchTotalSales = useCallback(async () => {
+    try {
+      setIsLoadingSales(true);
+      const response = await fetch(`${API_BASE_URL}/api/products/total-sales`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch total sales');
+      }
+
+      const data = await response.json();
+      setTotalSales(data.totalSales);
+    } catch (error) {
+      console.error('Error fetching total sales:', error);
+      // Keep the default value of 0 if fetch fails
+    } finally {
+      setIsLoadingSales(false);
+    }
+  }, [token]);
+
+  // Function to fetch weekly analytics (sales & visits Mon-Sun)
+  const fetchWeeklyAnalytics = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/products/analytics/weekly`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch weekly analytics');
+      }
+
+      const data = await response.json();
+      setWeeklyChartData(data.data || []);
+      setAnalyticsRangeLabel(data.range?.label || "");
+    } catch (error) {
+      console.error('Error fetching weekly analytics:', error);
+      // Keep zeros if fetch fails
+      setWeeklyChartData([
+        { name: "Mon", sales: 0, visits: 0 },
+        { name: "Tue", sales: 0, visits: 0 },
+        { name: "Wed", sales: 0, visits: 0 },
+        { name: "Thu", sales: 0, visits: 0 },
+        { name: "Fri", sales: 0, visits: 0 },
+        { name: "Sat", sales: 0, visits: 0 },
+        { name: "Sun", sales: 0, visits: 0 },
+      ]);
+      setAnalyticsRangeLabel("");
+    } finally {
+    }
+  }, [token]);
+
+  // Fetch user count, site visits count, total sales, and weekly analytics on mount
   useEffect(() => {
     if (token) {
       fetchUserCount();
       fetchSiteVisitsCount();
+      fetchTotalSales();
+      fetchWeeklyAnalytics();
     }
-  }, [token, fetchUserCount, fetchSiteVisitsCount]);
+  }, [token, fetchUserCount, fetchSiteVisitsCount, fetchTotalSales, fetchWeeklyAnalytics]);
 
   const navItems = [
    { label: 'Dashboard Overview', href: '/admin/dashboard', active: true, icon: <LayoutDashboard className="w-5 h-5 text-gray-500" /> },
@@ -109,19 +184,11 @@ const AdminDashboard: React.FC = () => {
   const stats: StatCard[] = [
     { title: "Users", value: isLoadingUserCount ? "..." : userCount.toString(), icon: <Users className="w-5 h-5" />, color: "text-purple-600", bgColor: "bg-purple-100" },
     { title: "Site Visits", value: isLoadingSiteVisits ? "..." : siteVisitsCount.toString(), icon: <TrendingUp className="w-5 h-5" />, color: "text-green-600", bgColor: "bg-green-100" },
-    { title: "Sales", value: "₱100K", icon: <ShoppingBag className="w-5 h-5" />, color: "text-red-600", bgColor: "bg-red-100" },
-    { title: "Pending Orders", value: "68", icon: <Clock className="w-5 h-5" />, color: "text-blue-600", bgColor: "bg-blue-100" }
+    { title: "Sales", value: isLoadingSales ? "..." : `₱${totalSales.toLocaleString()}`, icon: <ShoppingBag className="w-5 h-5" />, color: "text-red-600", bgColor: "bg-red-100" },
+    { title: "Pending Approval", value: "68", icon: <Clock className="w-5 h-5" />, color: "text-blue-600", bgColor: "bg-blue-100" }
   ];
 
-  const chartData = [
-    { name: "Mon", sales: 4000, visits: 2400 },
-    { name: "Tue", sales: 3000, visits: 1398 },
-    { name: "Wed", sales: 2000, visits: 9800 },
-    { name: "Thu", sales: 2780, visits: 3908 },
-    { name: "Fri", sales: 1890, visits: 4800 },
-    { name: "Sat", sales: 2390, visits: 3800 },
-    { name: "Sun", sales: 3490, visits: 4300 }
-  ];
+  const chartData = weeklyChartData;
 
   // Logout
   const handleLogout = () => {
@@ -245,7 +312,10 @@ const AdminDashboard: React.FC = () => {
 
           {/* Graphs */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Sales & Visits</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Sales & Visits</h2>
+            {analyticsRangeLabel ? (
+              <div className="text-xs text-gray-500 mb-3">{analyticsRangeLabel}</div>
+            ) : null}
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />

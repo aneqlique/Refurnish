@@ -5,6 +5,7 @@
   "scripts": {
     "start": "nodemon",
     "init-admin": "node src/scripts/initAdmin.js",
+    "add-sold-product": "node src/scripts/addSoldProduct.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

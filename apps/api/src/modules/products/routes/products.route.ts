@@ -6,6 +6,8 @@ import {
   getProductById,
   updateProduct,
   deleteProduct,
+  getTotalSales,
+  getWeeklyAnalytics,
 } from "../controllers/products.controller";
 import authMiddleware from "../../../middleware/auth";
 import multer from "multer";
@@ -15,6 +17,10 @@ const upload = multer({ dest: "uploads/" });
 const productRoutes = Router();
 
 productRoutes.get("/", getProducts);
+
+productRoutes.get("/total-sales", getTotalSales);
+
+productRoutes.get("/analytics/weekly", getWeeklyAnalytics);
 
 productRoutes.get("/:id", getProductById);
 
