@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import cloudinary from "cloudinary";
 import Product, { IProduct } from "../models/products.model";
+import SiteVisit from "../../site-visits/models/site-visits.model";
 
 declare global {
   namespace Express {
@@ -58,7 +59,7 @@ export const getProducts = async (req: Request, res: Response) => {
     const { status, search, category, location } = req.query;
     const query: any = {};
 
-    if (status && ["for_sale", "for_swap", "both"].includes(status as string)) {
+    if (status && ["for_sale", "for_swap", "both", "listed"].includes(status as string)) {
       query.status = status;
     }
     if (search) {
@@ -147,6 +148,92 @@ export const getTotalSales = async (req: Request, res: Response) => {
   }
 };
 
+// Get site earnings for the current month (5% commission on sold items)
+export const getMonthlyEarnings = async (req: Request, res: Response) => {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Consider products sold this month; use updatedAt to reflect status change time
+    const soldThisMonth = await Product.find({
+      status: 'sold',
+      updatedAt: { $gte: monthStart, $lte: monthEnd },
+    });
+
+    const grossSales = soldThisMonth.reduce((total, product) => total + (product.price || 0), 0);
+    const commission = grossSales * 0.05;
+
+    const monthLabel = monthStart.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+    res.status(200).json({
+      month: monthLabel,
+      grossSales,
+      commission,
+      soldCount: soldThisMonth.length,
+    });
+  } catch (err) {
+    console.error('Error calculating monthly earnings:', err);
+    res.status(500).json({ error: 'Failed to calculate monthly earnings' });
+  }
+};
+
+// Get weekly analytics for sales (sold products) and visits
+// Get products for approval (admin only)
+export const getProductsForApproval = async (req: Request, res: Response) => {
+  try {
+    const products = await Product.find({ status: "for_approval" })
+      .populate("owner", "firstName lastName email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(products);
+  } catch (err) {
+    console.error("Error fetching products for approval:", err);
+    res.status(500).json({ error: "Failed to fetch products for approval" });
+  }
+};
+
+// Approve or reject product (admin only)
+export const moderateProduct = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body; // "approve" or "reject"
+
+    if (!["approve", "reject"].includes(action)) {
+      return res.status(400).json({ error: "Invalid action. Must be 'approve' or 'reject'" });
+    }
+
+    let updateData: any = {};
+    
+    if (action === "approve") {
+      // Upon approval, mark as listed
+      updateData.status = "listed";
+    } else {
+      // For reject, we could either delete or mark as rejected
+      // For now, let's delete the product
+      await Product.findByIdAndDelete(id);
+      return res.status(200).json({ message: "Product rejected and removed" });
+    }
+
+    const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!updatedProduct) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    res.status(200).json({
+      message: `Product ${action}d successfully`,
+      product: updatedProduct,
+    });
+  } catch (err) {
+    console.error("Error moderating product:", err);
+    res.status(500).json({ error: "Failed to moderate product" });
+  }
+};
+
 // Get weekly analytics for sales (sold products) and visits
 export const getWeeklyAnalytics = async (req: Request, res: Response) => {
   try {
@@ -195,7 +282,6 @@ export const getWeeklyAnalytics = async (req: Request, res: Response) => {
     ]);
 
     // Visits aggregation within range
-    const SiteVisit = (await import('../../site-visits/models/site-visits.model')).default;
     const visitsAgg = await SiteVisit.aggregate([
       { $match: { timestamp: { $gte: monday, $lte: sunday } } },
       {

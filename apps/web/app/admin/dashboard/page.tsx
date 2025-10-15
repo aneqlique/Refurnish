@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Users, TrendingUp, ShoppingBag, Clock, Menu } from 'lucide-react';
+import { Users, TrendingUp, ShoppingBag, Clock, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Montserrat } from 'next/font/google';
 import { LogOut, LayoutDashboard, PackageCheck } from "lucide-react";
 import { useAuth } from '../../../contexts/AuthContext';
@@ -41,6 +41,8 @@ const AdminDashboard: React.FC = () => {
   const [isLoadingSiteVisits, setIsLoadingSiteVisits] = useState(true);
   const [totalSales, setTotalSales] = useState<number>(0);
   const [isLoadingSales, setIsLoadingSales] = useState(true);
+  const [pendingApprovalCount, setPendingApprovalCount] = useState<number>(0);
+  const [isLoadingPending, setIsLoadingPending] = useState(true);
   const [weeklyChartData, setWeeklyChartData] = useState<Array<{ name: string; sales: number; visits: number }>>([
     { name: "Mon", sales: 0, visits: 0 },
     { name: "Tue", sales: 0, visits: 0 },
@@ -51,6 +53,7 @@ const AdminDashboard: React.FC = () => {
     { name: "Sun", sales: 0, visits: 0 },
   ]);
   const [analyticsRangeLabel, setAnalyticsRangeLabel] = useState<string>("");
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date | null>(null);
 
   // Function to fetch user count
   const fetchUserCount = useCallback(async () => {
@@ -131,9 +134,10 @@ const AdminDashboard: React.FC = () => {
   }, [token]);
 
   // Function to fetch weekly analytics (sales & visits Mon-Sun)
-  const fetchWeeklyAnalytics = useCallback(async () => {
+  const fetchWeeklyAnalytics = useCallback(async (startDate?: Date) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/products/analytics/weekly`, {
+      const params = startDate ? `?startDate=${encodeURIComponent(startDate.toISOString())}` : '';
+      const response = await fetch(`${API_BASE_URL}/api/products/analytics/weekly${params}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -165,15 +169,74 @@ const AdminDashboard: React.FC = () => {
     }
   }, [token]);
 
+  // Function to fetch pending approval count
+  const fetchPendingApprovalCount = useCallback(async () => {
+    try {
+      setIsLoadingPending(true);
+      const response = await fetch(`${API_BASE_URL}/api/products/for-approval`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch pending approval');
+      }
+
+      const data = await response.json();
+      setPendingApprovalCount(Array.isArray(data) ? data.length : 0);
+    } catch (error) {
+      console.error('Error fetching pending approval count:', error);
+    } finally {
+      setIsLoadingPending(false);
+    }
+  }, [token]);
+
   // Fetch user count, site visits count, total sales, and weekly analytics on mount
   useEffect(() => {
     if (token) {
       fetchUserCount();
       fetchSiteVisitsCount();
       fetchTotalSales();
-      fetchWeeklyAnalytics();
+      const now = new Date();
+      setCurrentWeekStart(now);
+      fetchWeeklyAnalytics(now);
+      fetchPendingApprovalCount();
     }
-  }, [token, fetchUserCount, fetchSiteVisitsCount, fetchTotalSales, fetchWeeklyAnalytics]);
+  }, [token, fetchUserCount, fetchSiteVisitsCount, fetchTotalSales, fetchWeeklyAnalytics, fetchPendingApprovalCount]);
+
+  // Helpers for week navigation
+  const getMonday = (d: Date) => {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = day === 0 ? -6 : 1 - day; // adjust to Monday
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + diff);
+    return date;
+  };
+
+  const handlePrevWeek = () => {
+    if (!currentWeekStart) return;
+    const monday = getMonday(currentWeekStart);
+    const prev = new Date(monday);
+    prev.setDate(monday.getDate() - 7);
+    setCurrentWeekStart(prev);
+    fetchWeeklyAnalytics(prev);
+  };
+
+  const handleNextWeek = () => {
+    if (!currentWeekStart) return;
+    const monday = getMonday(currentWeekStart);
+    const next = new Date(monday);
+    next.setDate(monday.getDate() + 7);
+    // Do not allow navigating into future weeks beyond current week's Monday
+    const todayMonday = getMonday(new Date());
+    if (next > todayMonday) return;
+    setCurrentWeekStart(next);
+    fetchWeeklyAnalytics(next);
+  };
 
   const navItems = [
    { label: 'Dashboard Overview', href: '/admin/dashboard', active: true, icon: <LayoutDashboard className="w-5 h-5 text-gray-500" /> },
@@ -185,7 +248,7 @@ const AdminDashboard: React.FC = () => {
     { title: "Users", value: isLoadingUserCount ? "..." : userCount.toString(), icon: <Users className="w-5 h-5" />, color: "text-purple-600", bgColor: "bg-purple-100" },
     { title: "Site Visits", value: isLoadingSiteVisits ? "..." : siteVisitsCount.toString(), icon: <TrendingUp className="w-5 h-5" />, color: "text-green-600", bgColor: "bg-green-100" },
     { title: "Sales", value: isLoadingSales ? "..." : `₱${totalSales.toLocaleString()}`, icon: <ShoppingBag className="w-5 h-5" />, color: "text-red-600", bgColor: "bg-red-100" },
-    { title: "Pending Approval", value: "68", icon: <Clock className="w-5 h-5" />, color: "text-blue-600", bgColor: "bg-blue-100" }
+    { title: "Pending Approval", value: isLoadingPending ? "..." : pendingApprovalCount.toString(), icon: <Clock className="w-5 h-5" />, color: "text-blue-600", bgColor: "bg-blue-100" }
   ];
 
   const chartData = weeklyChartData;
@@ -312,7 +375,27 @@ const AdminDashboard: React.FC = () => {
 
           {/* Graphs */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Sales & Visits</h2>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-lg font-semibold text-gray-900">Sales & Visits</h2>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handlePrevWeek}
+                  className="p-1 rounded-md hover:bg-gray-100"
+                  aria-label="Previous week"
+                  title="Previous week"
+                >
+                  <ChevronLeft className="w-4 h-4 text-gray-700" />
+                </button>
+                <button
+                  onClick={handleNextWeek}
+                  className="p-1 rounded-md hover:bg-gray-100"
+                  aria-label="Next week"
+                  title="Next week"
+                >
+                  <ChevronRight className="w-4 h-4 text-gray-700" />
+                </button>
+              </div>
+            </div>
             {analyticsRangeLabel ? (
               <div className="text-xs text-gray-500 mb-3">{analyticsRangeLabel}</div>
             ) : null}

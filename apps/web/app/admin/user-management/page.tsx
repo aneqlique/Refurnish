@@ -28,7 +28,7 @@ interface UserRow {
 
 const UserManagementPage: React.FC = () => {
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 9;
@@ -246,11 +246,30 @@ const UserManagementPage: React.FC = () => {
 
           {/* Admin Profile */}
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
-              <Users className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 bg-[#636B2F] rounded-full flex items-center justify-center overflow-hidden">
+              {user?.profilePicture ? (
+                <Image 
+                  src={user.profilePicture} 
+                  alt={`${user.firstName} ${user.lastName}`}
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.currentTarget as HTMLImageElement;
+                    const nextElement = target.nextElementSibling as HTMLElement;
+                    target.style.display = 'none';
+                    if (nextElement) nextElement.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <span className={`${user?.profilePicture ? 'hidden' : 'flex'} items-center justify-center w-full h-full text-white font-semibold text-lg`}>
+                {user?.firstName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'A'}
+              </span>
             </div>
             <div>
-              <div className="font-semibold text-gray-900">Juan Dela Cruz</div>
+              <div className="font-semibold text-gray-900">
+                {user?.firstName} {user?.lastName}
+              </div>
               <div className="text-sm text-gray-500">Administrator</div>
             </div>
           </div>

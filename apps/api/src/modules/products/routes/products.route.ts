@@ -8,6 +8,9 @@ import {
   deleteProduct,
   getTotalSales,
   getWeeklyAnalytics,
+  getProductsForApproval,
+  moderateProduct,
+  getMonthlyEarnings,
 } from "../controllers/products.controller";
 import authMiddleware from "../../../middleware/auth";
 import multer from "multer";
@@ -19,8 +22,11 @@ const productRoutes = Router();
 productRoutes.get("/", getProducts);
 
 productRoutes.get("/total-sales", getTotalSales);
+productRoutes.get("/earnings/monthly", getMonthlyEarnings);
 
 productRoutes.get("/analytics/weekly", getWeeklyAnalytics);
+
+productRoutes.get("/for-approval", getProductsForApproval);
 
 productRoutes.get("/:id", getProductById);
 
@@ -34,5 +40,7 @@ productRoutes.post(
 productRoutes.put("/:id", authMiddleware, updateProduct);
 
 productRoutes.delete("/:id", authMiddleware, deleteProduct);
+
+productRoutes.post("/:id/moderate", authMiddleware, moderateProduct);
 
 export default productRoutes;
