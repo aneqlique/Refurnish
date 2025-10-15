@@ -6,7 +6,7 @@ import SiteVisit from "../../site-visits/models/site-visits.model";
 declare global {
   namespace Express {
     interface Request {
-      file?: any;
+      file?: Express.Multer.File;
     }
   }
 }

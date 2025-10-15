@@ -11,6 +11,12 @@ export interface IUser extends Document {
   googleId?: string;
   profilePicture?: string;
   isEmailVerified: boolean;
+  contactNumber?: string;
+  address?: string;
+  birthday?: Date;
+  gender?: 'male' | 'female' | 'other';
+  lastActive?: Date;
+  isOnline?: boolean;
   generateAuthToken(): string;
 }
 
@@ -23,6 +29,12 @@ const UserSchema: Schema = new Schema({
   googleId: { type: String, unique: true, sparse: true },
   profilePicture: { type: String },
   isEmailVerified: { type: Boolean, default: false },
+  contactNumber: { type: String },
+  address: { type: String },
+  birthday: { type: Date },
+  gender: { type: String, enum: ['male', 'female', 'other'], required: false },
+  lastActive: { type: Date, default: Date.now },
+  isOnline: { type: Boolean, default: false },
 }, {
   timestamps: true
 });

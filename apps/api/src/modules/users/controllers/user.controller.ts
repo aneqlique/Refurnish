@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import User from "../models/user.model";
 import { io } from "../../../app";
 import config from "../../../config/config";
+import cloudinary from "cloudinary";
 
 // Validation helper
 const validateEmail = (email: string): boolean => {
@@ -144,7 +145,10 @@ export const googleAuth = async (req: Request, res: Response) => {
         // Link Google account to existing user
         console.log('Google Auth: Linking Google account to existing user');
         user.googleId = googleId;
-        user.profilePicture = profilePicture;
+        // Only update profile picture if user doesn't have a custom one
+        if (!user.profilePicture || user.profilePicture.includes('googleusercontent.com')) {
+          user.profilePicture = profilePicture;
+        }
         await user.save();
       } else {
         // Create new user
@@ -162,8 +166,8 @@ export const googleAuth = async (req: Request, res: Response) => {
         console.log('Google Auth: New user created:', user._id);
       }
     } else {
-      // Update existing user's profile picture if it's different
-      if (user.profilePicture !== profilePicture) {
+      // Update existing user's profile picture only if they don't have a custom one
+      if (!user.profilePicture || user.profilePicture.includes('googleusercontent.com')) {
         console.log('Google Auth: Updating profile picture for existing user');
         user.profilePicture = profilePicture;
         await user.save();
@@ -265,11 +269,79 @@ export const getProfile = async (req: Request, res: Response) => {
       email: user.email,
       role: user.role,
       profilePicture: user.profilePicture,
-      isEmailVerified: user.isEmailVerified
+      isEmailVerified: user.isEmailVerified,
+      contactNumber: (user as any).contactNumber,
+      address: (user as any).address,
+      birthday: (user as any).birthday,
+      gender: (user as any).gender
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const updateProfile = async (req: Request, res: Response) => {
+  try {
+    const { _id: userId } = req.user;
+    const { firstName, lastName, profilePicture, contactNumber, address, birthday, gender } = req.body as {
+      firstName?: string;
+      lastName?: string;
+      profilePicture?: string;
+      contactNumber?: string;
+      address?: string;
+      birthday?: string;
+      gender?: 'male' | 'female' | 'other';
+    };
+
+    const updates: any = {};
+    if (typeof firstName === 'string') updates.firstName = firstName;
+    if (typeof lastName === 'string') updates.lastName = lastName;
+    if (typeof profilePicture === 'string') updates.profilePicture = profilePicture;
+    if (typeof contactNumber === 'string') updates.contactNumber = contactNumber;
+    if (typeof address === 'string') updates.address = address;
+    if (typeof birthday === 'string') updates.birthday = new Date(birthday);
+    if (gender) updates.gender = gender;
+
+    const updated = await User.findByIdAndUpdate(userId, updates, { new: true }).select('-password');
+    if (!updated) return res.status(404).json({ message: 'User not found' });
+
+    return res.status(200).json({
+      message: 'Profile updated successfully',
+      user: {
+        id: updated._id,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        email: updated.email,
+        role: updated.role,
+        profilePicture: updated.profilePicture,
+      contactNumber: (updated as any).contactNumber,
+      address: (updated as any).address,
+      birthday: (updated as any).birthday,
+      gender: (updated as any).gender,
+      },
+    });
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({ message: 'Failed to update profile' });
+  }
+};
+
+export const uploadProfilePicture = async (req: Request, res: Response) => {
+  try {
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const result = await cloudinary.v2.uploader.upload(file.path, {
+      folder: 'refurnish-profile',
+      public_id: `user_${(req as any).user._id}_${Date.now()}`,
+      overwrite: true,
+    });
+
+    return res.status(200).json({ url: result.secure_url });
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({ message: 'Failed to upload profile picture' });
   }
 };
 
@@ -396,5 +468,80 @@ export const adminDeleteUser = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error(error);
     return res.status(500).json({ message: 'Failed to delete user' });
+  }
+};
+
+// Authenticated lookup by email (non-admin) - smart search with multiple results
+export const lookupUserByEmail = async (req: Request, res: Response) => {
+  try {
+    const email = (req.query.email as string || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'email is required' });
+
+    // First try exact match
+    const exactUser = await User.findOne({ email }).select('_id firstName lastName email role profilePicture');
+    if (exactUser) {
+      return res.status(200).json([{
+        id: exactUser._id,
+        firstName: exactUser.firstName,
+        lastName: exactUser.lastName,
+        email: exactUser.email,
+        role: exactUser.role,
+        profilePicture: exactUser.profilePicture,
+      }]);
+    }
+
+    // If no exact match, do smart search with partial matches
+    const searchTerm = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape regex special chars
+    const users = await User.find({
+      $or: [
+        { email: { $regex: searchTerm, $options: 'i' } },
+        { firstName: { $regex: searchTerm, $options: 'i' } },
+        { lastName: { $regex: searchTerm, $options: 'i' } },
+        { $expr: { $regexMatch: { input: { $concat: ['$firstName', ' ', '$lastName'] }, regex: searchTerm, options: 'i' } } }
+      ]
+    })
+    .select('_id firstName lastName email role profilePicture')
+    .limit(5)
+    .sort({ email: 1 });
+
+    const results = users.map(user => ({
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      profilePicture: user.profilePicture,
+    }));
+
+    return res.status(200).json(results);
+  } catch (e) {
+    return res.status(500).json({ error: 'Lookup failed' });
+  }
+};
+
+export const updateUserActivity = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    await User.findByIdAndUpdate(userId, { 
+      lastActive: new Date(),
+      isOnline: true 
+    });
+    return res.status(200).json({ message: 'Activity updated' });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to update activity' });
+  }
+};
+
+export const getActiveUsers = async (req: Request, res: Response) => {
+  try {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const activeUsers = await User.find({
+      lastActive: { $gte: fiveMinutesAgo },
+      isOnline: true
+    }).select('_id firstName lastName email role profilePicture lastActive isOnline');
+    
+    return res.status(200).json(activeUsers);
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to fetch active users' });
   }
 };

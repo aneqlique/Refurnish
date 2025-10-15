@@ -10,6 +10,10 @@ interface User {
   email: string;
   role: 'buyer' | 'seller' | 'admin';
   profilePicture?: string;
+  contactNumber?: string;
+  address?: string;
+  birthday?: string; // ISO date
+  gender?: 'male' | 'female' | 'other';
 }
 
 interface AuthContextType {
@@ -22,6 +26,9 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  refreshProfile: () => Promise<void>;
+  updateUser: (partial: Partial<User>) => void;
+  updateActivity: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -54,6 +61,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(session.backendToken);
       localStorage.setItem('token', session.backendToken);
       localStorage.setItem('user', JSON.stringify(session.backendUser));
+      // Hydrate with full profile from backend so extended fields are present
+      (async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/users/profile`, {
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.backendToken}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const fullUser: User = {
+              id: data.id,
+              firstName: data.firstName,
+              lastName: data.lastName,
+              email: data.email,
+              role: data.role,
+              profilePicture: data.profilePicture,
+              contactNumber: data.contactNumber,
+              address: data.address,
+              birthday: data.birthday,
+              gender: data.gender,
+            };
+            setUser(fullUser);
+            localStorage.setItem('user', JSON.stringify(fullUser));
+          }
+        } catch {}
+      })();
     } else if (status === 'unauthenticated') {
       console.log('AuthContext: User unauthenticated, clearing state');
       setUser(null);
@@ -204,6 +236,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isLoading,
     isAuthenticated,
     isAdmin,
+    refreshProfile: async () => {
+      try {
+        if (!token) return;
+        const res = await fetch(`${API_BASE_URL}/api/users/profile`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to refresh profile');
+        const refreshed: User = {
+          id: data.id,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          role: data.role,
+          profilePicture: data.profilePicture,
+          contactNumber: data.contactNumber,
+          address: data.address,
+          birthday: data.birthday,
+          gender: data.gender,
+        };
+        setUser(refreshed);
+        localStorage.setItem('user', JSON.stringify({
+          id: data.id,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          role: data.role,
+          profilePicture: data.profilePicture,
+          contactNumber: data.contactNumber,
+          address: data.address,
+          birthday: data.birthday,
+          gender: data.gender,
+        }));
+      } catch (e) {
+        // swallow
+      }
+    },
+    updateUser: (partial: Partial<User>) => {
+      setUser((prev) => {
+        const merged = { ...(prev || ({} as User)), ...partial } as User;
+        localStorage.setItem('user', JSON.stringify(merged));
+        return merged;
+      });
+    },
+    updateActivity: async () => {
+      try {
+        if (!token) return;
+        await fetch(`${API_BASE_URL}/api/users/activity`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } catch (e) {
+        // swallow errors for activity tracking
+      }
+    },
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

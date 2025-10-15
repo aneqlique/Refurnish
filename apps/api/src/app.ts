@@ -7,6 +7,8 @@ import { Server as SocketIOServer } from "socket.io";
 import userRoutes from "./modules/users/routes/user.route";
 import productRoutes from "./modules/products/routes/products.route";
 import siteVisitRoutes from "./modules/site-visits/routes/site-visits.route";
+import sellerProfileRoutes from "./modules/users/routes/seller-profile.route";
+import messagesRoutes from "./modules/messages/routes/messages.route";
 
 const app = express();
 
@@ -33,8 +35,12 @@ app.get("/", (req, res) => {
 
 //API routes registration
 app.use("/api/users", userRoutes);
+// Expose seller endpoints under two prefixes for compatibility
+app.use("/api/seller", sellerProfileRoutes);
+app.use("/api/users/seller", sellerProfileRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/site-visits", siteVisitRoutes);
+app.use("/api/chat", messagesRoutes);
 
 //Socket.io setup
 const httpServer = http.createServer(app);
@@ -60,8 +66,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send_message", (message) => {
-    // Logic to save message to database
-    io.to(message.chatId).emit("receive_message", message);
+    // Broadcast only to the specific conversation room
+    const roomId = message.chatId || message.conversationId;
+    if (roomId) {
+      io.to(roomId).emit("receive_message", message);
+    }
   });
 
   socket.on("disconnect", () => {

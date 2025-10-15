@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "../contexts/AuthContext";
 import SessionProvider from "../components/SessionProvider";
 import SiteVisitTracker from "../components/SiteVisitTracker";
+import ActivityTracker from "../components/ActivityTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,6 +42,7 @@ export default function RootLayout({
         <SessionProvider>
           <AuthProvider>
             <SiteVisitTracker />
+            <ActivityTracker />
             {children}
           </AuthProvider>
         </SessionProvider>

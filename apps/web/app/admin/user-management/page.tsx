@@ -33,6 +33,7 @@ const UserManagementPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 9;
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [activeUsers, setActiveUsers] = useState<Set<string>>(new Set());
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://refurnish-backend.onrender.com';
@@ -66,6 +67,7 @@ const UserManagementPage: React.FC = () => {
   const navItems = [
   { label: 'Dashboard Overview', href: '/admin/dashboard', active: false, icon: <LayoutDashboard className="w-5 h-5 text-gray-500" /> },
   { label: 'User Management', href: '/admin/user-management', active: true, icon: <Users className="w-5 h-5 text-gray-500" /> },
+  { label: 'Seller Management', href: '/admin/seller-management', active: false, icon: <PackageCheck className="w-5 h-5 text-gray-500" /> },
   { label: 'Product Moderation', href: '/admin/product-moderation', active: false, icon: <PackageCheck className="w-5 h-5 text-gray-500" /> },
 ];
 
@@ -131,6 +133,34 @@ const UserManagementPage: React.FC = () => {
     fetchUsers();
     return () => controller.abort();
   }, [token, API_BASE_URL, currentPage, pageSize, search]);
+
+  // Fetch active users
+  const fetchActiveUsers = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/active`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setActiveUsers(new Set(data.map((user: any) => user._id)));
+      }
+    } catch (error) {
+      console.error('Error fetching active users:', error);
+    }
+  };
+
+  // Fetch active users on mount and every 30 seconds
+  useEffect(() => {
+    if (!token) return;
+    
+    fetchActiveUsers();
+    const interval = setInterval(fetchActiveUsers, 30000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   // Socket.IO: auto-refresh on user updates/deletes
   useEffect(() => {
@@ -372,7 +402,22 @@ const UserManagementPage: React.FC = () => {
                       <div className="text-gray-500 text-xs">{user.createdTime}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-medium text-green-800 bg-green-100 rounded-full">{user.status}</span>
+                      <div className="flex items-center space-x-2">
+                        {activeUsers.has(user.id) ? (
+                          <span className="px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded-full flex items-center">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                            Online
+                          </span>
+                        ) : (
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            user.status === 'Active' ? 'text-green-800 bg-green-100' :
+                            user.status === 'Inactive' ? 'text-yellow-800 bg-yellow-100' :
+                            'text-red-800 bg-red-100'
+                          }`}>
+                            {user.status}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap z-50 text-right text-sm text-gray-500 relative" data-action-menu>
                       <button

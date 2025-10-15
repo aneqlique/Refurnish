@@ -22,28 +22,28 @@ const AboutPage = () => {
 
   const teamMembers = [
     {
-      name: "Jihyo Park",
-      role: "CEO & Founder",
+      name: "Lark Sigmuond Babao",
+      role: "Project Manager",
       image: "/api/placeholder/200/200",
-      description: "Passionate about sustainable living and circular economy solutions."
+      description: "Luto na ang kanin, pwede niyo na kong ulamin."
     },
     {
-      name: "Jeongyeon Yoo",
-      role: "CTO",
+      name: "Arwind Alan Roie Cariño",
+      role: "Software Developer",
       image: "/api/placeholder/200/200", 
-      description: "Tech enthusiast focused on creating seamless user experiences."
+      description: "Anong basa sa Gucci? Guchi? Aral ka muna Gussi yun hindi Guchi!"
     },
     {
-      name: "Dahyun Kim",
-      role: "Head of Operations",
+      name: "Jason Angeles",
+      role: "Software Developer",
       image: "/api/placeholder/200/200",
-      description: "Expert in marketplace operations and customer satisfaction."
+      description: "Kai Sotto, ginuho ang munggo."
     },
     {
-      name: "Nayeon Im",
-      role: "Head of Marketing",
+      name: "Angelique Anne Valdez",
+      role: "Software Developer",
       image: "/api/placeholder/200/200",
-      description: "Creative strategist helping people discover sustainable furniture options."
+      description: "Dili ko gahatag ug iyot."
     }
   ];
 
