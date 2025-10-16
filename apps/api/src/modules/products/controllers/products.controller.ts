@@ -56,11 +56,14 @@ export const uploadProduct = async (req: Request, res: Response) => {
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
-    const { status, search, category, location } = req.query;
+    const { status, search, category, location, listedAs } = req.query;
     const query: any = {};
 
     if (status && ["for_sale", "for_swap", "both", "listed"].includes(status as string)) {
       query.status = status;
+    }
+    if (listedAs && ["sale", "swap"].includes(listedAs as string)) {
+      query.listedAs = listedAs;
     }
     if (search) {
       query.title = { $regex: search, $options: "i" };
@@ -85,7 +88,7 @@ export const getProductById = async (req: Request, res: Response) => {
   try {
     const product = await Product.findById(req.params.id).populate(
       "owner",
-      "email"
+      "firstName lastName email"
     );
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
