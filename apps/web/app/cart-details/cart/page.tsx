@@ -5,7 +5,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Footer from '../../../components/Footer';
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
+import PaymentMockupModal from "../../../components/PaymentMockupModal";
+
 
 type CartItem = {
   id: string;
@@ -14,6 +16,11 @@ type CartItem = {
   quantity: number;
   thumbnailSrc?: string;
   selected: boolean;
+};
+
+type PaymentModalPropsState = {
+  provider: "gcash" | "paymaya" | string;
+  txnId?: string; // optional
 };
 
 const currency = new Intl.NumberFormat("en-PH", {
@@ -378,10 +385,49 @@ function CheckoutModal({
   onClose: () => void;
 }) {
   const total = subtotal + shippingFee;
+  // state for showing the separate payment modal
+  
+  const [paymentModalOpen, setPaymentModalOpen] = useState<boolean>(false);
+  const [paymentModalProps, setPaymentModalProps] = useState<PaymentModalPropsState>({ provider: "gcash" });
+
+
+  const [selection, setSelection] = useState({
+  paymentMode: "Cash on Delivery",
+  ewalletOption: "gcash",
+  cardType: "debit",
+  deliveryMode: "LBC Express",
+  });
+
+  function handlePlaceOrder() {
+    // If user selected an e-wallet, open the payment mockup modal
+    if (selection.paymentMode === "Ewallet") {
+      const provider = selection.ewalletOption || "gcash"; // e.g. 'gcash' or 'paymaya'
+
+      // In a real app: call your backend to create a payment session and get a txnId/QR.
+      // For the mock: generate a client-side id
+      const txnId = `txn_${Date.now().toString(36).slice(-8)}`;
+
+      setPaymentModalProps({ provider, txnId });
+
+      // Option A: Open payment modal on top of checkout modal:
+      setPaymentModalOpen(true);
+
+      // Option B: (preferred UX) close checkout then open payment modal:
+      // onClose(); 
+      // setTimeout(() => setPaymentModalOpen(true), 160);
+      return;
+    }
+
+    alert("Proceed with non-ewallet payment (demo)");
+    // Non-ewallet flow (COD or card): keep your existing logic here
+    // submitOrder(); or whatever you do
+  }
+
+
   return (
-    <div className="fixed inset-0 font-sans z-50 flex items-center justify-center">
+    <div className="fixed inset-0 font-sans z-50 flex items-center justify-center ">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative mx-4 w-full max-w-5xl rounded-3xl bg-white p-6 sm:p-8 shadow-xl" style={{ fontFamily: 'Fustat, Arial, Helvetica, sans-serif' }}>
+      <div className="relative mx-4 w-full max-w-5xl rounded-3xl max-h-[calc(100vh-4rem)] overflow-y-auto bg-white p-6 sm:p-8 shadow-xl" style={{ fontFamily: 'Fustat, Arial, Helvetica, sans-serif' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
             <h2 className="text-3xl font-semibold text-neutral-800 mb-6">Check Out Form</h2>
@@ -400,7 +446,7 @@ function CheckoutModal({
             </div>
 
             <p className="mt-8 font-semibold text-neutral-800">Your Order(s) :</p>
-            <ul className="mt-3 space-y-3">
+            <ul className="mt-3 space-y-3 max-h-95 overflow-y-auto pr-1">
               {items.map((item) => (
                 <li key={item.id} className="flex items-center justify-between gap-4 rounded-2xl bg-white ring-1 ring-black/[0.06] shadow-sm p-4">
                   <div className="flex items-center gap-4 min-w-0">
@@ -426,17 +472,15 @@ function CheckoutModal({
 
           <div className="space-y-6">
             <div className="space-y-4">
+            
+              <PaymentDeliverySelector onChange={(s) => setSelection(s)} />
+
               <div>
-                <p className="text-neutral-700 font-medium">Mode of Payment :</p>
-                <div className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center justify-between px-4">Cash on Delivery <span>›</span></div>
-              </div>
-              <div>
-                <p className="text-neutral-700 font-medium">Mode of Delivery :</p>
-                <div className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center justify-between px-4">LBC Express <span>›</span></div>
-              </div>
-              <div>
-                <p className="text-neutral-700 font-medium">Voucher Applied :</p>
-                <div className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center px-4 text-neutral-500">NONE</div>
+                <p className="text-neutral-700 font-medium">Refurnish Voucher :</p>
+                <input placeholder="Voucher Code" className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center px-4 text-neutral-500">
+                
+                  
+                 </input>
               </div>
             </div>
 
@@ -446,10 +490,19 @@ function CheckoutModal({
               <div className="flex items-center justify-between text-xl font-semibold text-[#636B2F]"><span>Total Payment :</span><span className="tabular-nums">{currency.format(total)}</span></div>
             </div>
 
-            <div className="flex items-center gap-4 pt-4">
+            <div className="flex items-center bottom-4 right-4  justify-end gap-4 pt-4">
               <button onClick={onClose} className="h-12 px-6 rounded-full ring-1 ring-black/[0.08] bg-white">Cancel</button>
-              <button className="h-12 px-6 rounded-full bg-[#636B2F] text-white">Place Order</button>
+              <button onClick={handlePlaceOrder} className="h-12 px-6 rounded-full bg-[#636B2F] text-white">Place Order</button>
             </div>
+            <PaymentMockupModal
+              open={paymentModalOpen}
+              onClose={() => setPaymentModalOpen(false)}
+              amount={total}                         // subtotal + shippingFee
+              provider={paymentModalProps.provider}  // 'gcash' or 'paymaya'
+              txnId={paymentModalProps.txnId}
+            />
+
+               
           </div>
         </div>
 
@@ -460,6 +513,12 @@ function CheckoutModal({
     </div>
   );
 }
+
+
+
+
+
+
 
 // Reserved for future SelectAllCheckbox enhancement
 
@@ -550,4 +609,240 @@ function FacebookIcon() {
   );
 }
 
+function PaymentDeliverySelector({ onChange }: { onChange?: (s: any) => void }) {
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [deliveryOpen, setDeliveryOpen] = useState(false);
 
+  const [paymentMode, setPaymentMode] = useState("Cash on Delivery");
+  const [ewalletOption, setEwalletOption] = useState("gcash");
+  const [cardType, setCardType] = useState("debit");
+
+  const [deliveryMode, setDeliveryMode] = useState("LBC Express");
+
+  const paymentRef = useRef<HTMLDivElement | null>(null);
+  const deliveryRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (paymentRef.current && !paymentRef.current.contains(e.target as Node)) {
+        setPaymentOpen(false);
+      }
+      if (deliveryRef.current && !deliveryRef.current.contains(e.target as Node)) {
+        setDeliveryOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // notify parent if needed
+  useEffect(() => {
+    if (typeof onChange === "function") {
+      onChange({ paymentMode, ewalletOption, cardType, deliveryMode });
+    }
+  }, [paymentMode, ewalletOption, cardType, deliveryMode, onChange]);
+
+  const paymentOptions = ["Cash on Delivery", "Ewallet", "Debit/Credit"];
+  const ewalletOptions = [
+    { id: "gcash", label: "", logo: "/icon/GCash_logo.png" },
+    { id: "paymaya", label: "", logo: "/icon/maya.jpg" },
+  ];
+  const deliveryOptions = [
+    "LBC Express",
+    "J&T Express",
+    "GGX",
+    "Ninja Van",
+    "Xend",
+    "2GO",
+    "GrabExpress",
+  ];
+
+  return (
+    <div className="space-y-4 w-full">
+      {/* Mode of Payment */}
+      <div>
+        <p className="text-neutral-700 font-medium">Mode of Payment :</p>
+
+        <div ref={paymentRef} className="relative">
+          <button
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={paymentOpen}
+            onClick={() => setPaymentOpen((s) => !s)}
+            className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center justify-between px-4 w-full bg-white"
+          >
+            <span className="text-left truncate">{paymentMode}</span>
+            <span className="ml-3 text-neutral-400">›</span>
+          </button>
+
+          {paymentOpen && (
+            <ul
+              role="listbox"
+              tabIndex={-1}
+              className="absolute z-10 mt-2 w-full rounded-lg bg-white ring-1 ring-black/[0.06] shadow-lg divide-y divide-neutral-100 max-h-56 overflow-auto"
+            >
+              {paymentOptions.map((opt) => (
+                <li
+                  key={opt}
+                  role="option"
+                  aria-selected={paymentMode === opt}
+                  onClick={() => {
+                    setPaymentMode(opt);
+                    setPaymentOpen(false);
+                  }}
+                  className="px-4 py-3 cursor-pointer hover:bg-neutral-50"
+                >
+                  {opt}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="mt-3">
+          {paymentMode === "Ewallet" && (
+            <div className="rounded-xl ring-1 ring-black/[0.06] p-3 bg-white">
+              <p className="text-sm font-medium text-neutral-700 mb-2">Choose e-wallet:</p>
+              <div className="flex gap-4 items-center flex-wrap">
+                {ewalletOptions.map((w) => (
+                  <label key={w.id} className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="ewallet"
+                      value={w.id}
+                      checked={ewalletOption === w.id}
+                      onChange={() => setEwalletOption(w.id)}
+                      className="cursor-pointer"
+                    />
+
+                    <img
+                      src={w.logo}
+                      alt={w.label}
+                      className="h-5 w-auto object-contain"
+                    />
+
+                    <span className="text-sm">{w.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-3 text-sm text-neutral-600">
+                {ewalletOption === "gcash" && <p>You'll be redirected to GCash to complete the payment.</p>}
+                {ewalletOption === "paymaya" && <p>You'll be redirected to PayMaya to complete the payment.</p>}
+              </div>
+            </div>
+          )}
+
+          {paymentMode === "Debit/Credit" && (
+            <div className="rounded-xl ring-1 ring-black/[0.06] p-3 bg-white">
+              <div className="flex items-center justify-between mb-2">
+
+                <p className="text-sm font-medium text-neutral-700">Card type:</p>
+                <div className="flex items-center gap-2">
+                  <img src="/icon/visa.png" alt="Visa" className="h-5" />
+                  <img src="/icon/card.png" alt="Mastercard" className="h-5" />
+                </div>
+              </div>
+              
+              
+              
+              <div className="flex gap-4 items-center">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="cardType"
+                    value="debit"
+                    checked={cardType === "debit"}
+                    onChange={() => setCardType("debit")}
+                  />
+                  <span className="text-sm">Debit</span>
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="cardType"
+                    value="credit"
+                    checked={cardType === "credit"}
+                    onChange={() => setCardType("credit")}
+                  />
+                  <span className="text-sm">Credit</span>
+                </label>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-2">
+                <input
+                  placeholder="Cardholder name"
+                  className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+                />
+                <input
+                  placeholder="Card number"
+                  inputMode="numeric"
+                  maxLength={20}
+                  className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm tabular-nums"
+                />
+                <div className="flex gap-2">
+                  <input
+                    placeholder="MM/YY"
+                    maxLength={5}
+                    className="w-1/2 rounded-md border border-neutral-200 px-3 py-2 text-sm"
+                  />
+                  <input
+                    placeholder="CVC"
+                    maxLength={3}
+                    className="w-1/2 rounded-md border border-neutral-200 px-3 py-2 text-sm tabular-nums"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {paymentMode === "Cash on Delivery" && (
+            <div className="mt-2 text-sm text-neutral-600">Pay with cash when your order is delivered.</div>
+          )}
+        </div>
+
+      </div>
+
+      {/* Mode of Delivery */}
+      <div>
+        <p className="text-neutral-700 font-medium">Mode of Delivery :</p>
+
+        <div ref={deliveryRef} className="relative">
+          <button
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={deliveryOpen}
+            onClick={() => setDeliveryOpen((s) => !s)}
+            className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center justify-between px-4 w-full bg-white"
+          >
+            <span className="text-left truncate">{deliveryMode}</span>
+            <span className="ml-3 text-neutral-400">›</span>
+          </button>
+
+          {deliveryOpen && (
+            <ul
+              role="listbox"
+              tabIndex={-1}
+              className="absolute z-10 mt-2 w-full rounded-lg bg-white ring-1 ring-black/[0.06] shadow-lg divide-y divide-neutral-100 max-h-56 overflow-auto"
+            >
+              {deliveryOptions.map((opt) => (
+                <li
+                  key={opt}
+                  role="option"
+                  aria-selected={deliveryMode === opt}
+                  onClick={() => {
+                    setDeliveryMode(opt);
+                    setDeliveryOpen(false);
+                  }}
+                  className="px-4 py-3 cursor-pointer hover:bg-neutral-50"
+                >
+                  {opt}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
