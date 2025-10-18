@@ -58,7 +58,6 @@ function ChairsCatalogContent() {
   const gridRef = useRef<HTMLDivElement>(null);
   const [catalog, setCatalog] = useState<ProductCatalogByCategory>(initialCatalog);
   const categories = ["ALL", ...Object.keys(catalog)];
-  const defaultCategory = "SALE";
   const [isSalePage, setIsSalePage] = useState(true); // since this is the Sale page
   const [activeCategory, setActiveCategory] = useState<string>("ALL");
   const [sortOption, setSortOption] = useState<string>("newest");
@@ -78,19 +77,28 @@ function ChairsCatalogContent() {
     if (categoryParam && categoryParam !== activeCategory) {
       setActiveCategory(categoryParam);
     }
-  }, [categoryParam]);
+  }, [categoryParam, activeCategory]);
 
-  // Fetch listed products and group by category
+  // Fetch sale products and group by category
   useEffect(() => {
     const controller = new AbortController();
     const fetchProducts = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch(`${API_BASE_URL}/api/products?status=listed`, { signal: controller.signal });
+        // Fetch products with listedAs="sale" OR listedAs="both" and status="listed"
+        const res = await fetch(`${API_BASE_URL}/api/products?status=listed&listedAs=sale`, { signal: controller.signal });
         const data: BackendProduct[] = await res.json();
         if (!res.ok) throw new Error('Failed to load products');
 
-        const mapped: CatalogProduct[] = (data || []).map((p) => ({
+        // Also fetch products with listedAs="both"
+        const resBoth = await fetch(`${API_BASE_URL}/api/products?status=listed&listedAs=both`, { signal: controller.signal });
+        const dataBoth: BackendProduct[] = await resBoth.json();
+        if (!resBoth.ok) throw new Error('Failed to load both products');
+
+        // Combine both results
+        const allProducts = [...(data || []), ...(dataBoth || [])];
+
+        const mapped: CatalogProduct[] = allProducts.map((p) => ({
           id: p._id,
           title: p.title,
           image: Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : '/products/chair/view1.jpg',
@@ -108,9 +116,19 @@ function ChairsCatalogContent() {
 
         setCatalog(grouped);
       } catch (e) {
-        setCatalog({});
+        // Only log errors that are not abort errors (which are expected when component unmounts)
+        if (e instanceof Error && e.name !== 'AbortError') {
+          console.error('Error fetching products:', e);
+        }
+        // Don't update state if the request was aborted
+        if (!controller.signal.aborted) {
+          setCatalog({});
+        }
       } finally {
-        setIsLoading(false);
+        // Only update loading state if the request wasn't aborted
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
     fetchProducts();
@@ -126,7 +144,7 @@ function ChairsCatalogContent() {
     if (!navbarRef.current) return;
     const navEl = navbarRef.current;
     const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
+      gsap.timeline({
         scrollTrigger: {
           trigger: "main",
           start: "top top",
@@ -134,12 +152,8 @@ function ChairsCatalogContent() {
           scrub: 0.5,
           onUpdate: (self) => {
             const progress = self.progress;
-            // const height = gsap.utils.interpolate(72, 60, progress);
-            // const marginX = gsap.utils.interpolate(12, 6, progress);
             const height = gsap.utils.interpolate(64, 60, progress);
             const marginX = gsap.utils.interpolate(32, 18, progress);
-            const marginY = gsap.utils.interpolate(0, 8, progress);
-            const paddingX = gsap.utils.interpolate(22, 16, progress);
             // use gsap.set to avoid layout thrash
             gsap.set(navEl, {
               height,
@@ -724,7 +738,11 @@ function ChairsCatalogContent() {
 
             {/* Results Count */}
             <div className="text-center text-sm text-gray-600 mb-4">
-              Showing {filteredItems.length} of {Object.values(catalog).flat().length} products
+              {isLoading ? (
+                "Loading products..."
+              ) : (
+                `Showing ${filteredItems.length} of ${Object.values(catalog).flat().length} products`
+              )}
             </div>
           </div>
         </section>
@@ -735,7 +753,11 @@ function ChairsCatalogContent() {
             ref={gridRef}
             className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6"
           >
-            {filteredProducts.length === 0 ? (
+            {isLoading ? (
+              <div className="col-span-full text-center py-20 text-gray-500">
+                Loading products...
+              </div>
+            ) : filteredProducts.length === 0 ? (
               <div className="col-span-full text-center py-20 text-gray-500">
                 No products in this category yet.
               </div>
