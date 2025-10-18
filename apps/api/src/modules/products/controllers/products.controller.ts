@@ -62,7 +62,7 @@ export const getProducts = async (req: Request, res: Response) => {
     if (status && ["for_sale", "for_swap", "both", "listed"].includes(status as string)) {
       query.status = status;
     }
-    if (listedAs && ["sale", "swap"].includes(listedAs as string)) {
+    if (listedAs && ["sale", "swap", "both"].includes(listedAs as string)) {
       query.listedAs = listedAs;
     }
     if (search) {

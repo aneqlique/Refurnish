@@ -32,7 +32,12 @@ type BackendProduct = {
   material: string;
   age: { value: number; unit: string };
   listedAs: string;
-  owner?: { email?: string; firstName?: string; lastName?: string };
+  owner?: { 
+    _id: string;
+    email: string; 
+    firstName: string; 
+    lastName: string; 
+  };
 };
 
 type Product = {
@@ -100,7 +105,7 @@ export default function ItemViewSalePage() {
           image: Array.isArray(p.images) && p.images[0] ? p.images[0] : '/products/chair/view1.jpg',
           location: p.location || 'Metro Manila',
           price: typeof p.price === 'number' ? p.price : 0,
-          seller: [p.owner?.firstName, p.owner?.lastName].filter(Boolean).join(' '),
+          seller: p.owner ? [p.owner.firstName, p.owner.lastName].filter(Boolean).join(' ') || 'Seller' : 'Seller',
           condition: p.condition,
           material: p.material,
           age: p.age ? `${p.age.value} ${p.age.unit}` : '—',
