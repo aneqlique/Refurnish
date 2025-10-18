@@ -97,7 +97,7 @@ export default function PaymentMockupModal({
             </div>
 
             <div className="p-6 overflow-auto">
-              <div className="rounded-md bg-white shadow-sm border">
+              <div className="rounded-md bg-white shadow-xl border-b border-gray-200 ">
                 <div className="p-5 border-b border-gray-100">
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <div>Merchant</div>
@@ -117,18 +117,18 @@ export default function PaymentMockupModal({
                     Login to pay with GCash
                   </h3>
 
-                  <div className="flex items-center justify-center mb-3 text-sm text-gray-500">
-                    +63
+                <div className="mb-4">
+                    <div className="flex items-center border border-gray-200 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-blue-200">
+                        <span className="px-3 text-sm text-gray-500 bg-gray-50 border-r border-gray-200 select-none">+63</span>
+                        <input
+                        id="payment-mockup-first-input"
+                        type="tel"
+                        placeholder="Mobile number"
+                        className="w-full px-4 py-3 text-sm outline-none"
+                        />
+                    </div>
                 </div>
 
-                  <div className="mb-4">
-                    <input
-                      id="payment-mockup-first-input"
-                      type="tel"
-                      placeholder="Mobile number"
-                      className="w-full px-4 py-3 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                    />
-                  </div>
 
                   <button className="w-full py-3 rounded-full bg-blue-500 text-white font-semibold">
                     NEXT
@@ -149,7 +149,7 @@ export default function PaymentMockupModal({
         {/* Provider: PayMaya (QR) */}
         {provider === "paymaya" && (
           <>
-            <div className="bg-white h-20 flex items-center justify-center border-b">
+            <div className="bg-white h-20 flex items-center justify-center border-gray-200 border-b">
               <div className="flex items-center gap-3">
                 <img
                   src={paymayaLogo}
@@ -161,7 +161,7 @@ export default function PaymentMockupModal({
             </div>
 
             <div className="p-6 overflow-auto">
-              <div className="max-w-md mx-auto bg-white p-4 rounded-lg shadow-sm border">
+              <div className="max-w-md mx-auto bg-white p-4 rounded-lg shadow-xl border-b border-gray-100">
                 <div className="mb-4">
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <div>Merchant</div>
