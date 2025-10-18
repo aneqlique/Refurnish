@@ -95,33 +95,50 @@ export default function WishlistPage() {
       <main className="mx-auto w-full max-w-6xl px-4 sm:px-6 md:px-8 flex-1">
         <CartTabs />
 
-        <div className="mt-6 rounded-2xl bg-white shadow-sm ring-1 font-sans  ring-black/[0.06]">
-          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 px-4 sm:px-6 py-3 text-sm font-semibold text-[#273815] font-sans">
-            <span className="sr-only">Select</span>
-            <div className="pl-40 font-sans">Product</div>
-            <div className="pl-153 font-sans">Quantity</div>
-            <div className="pl-1 font-sans">Price</div>
+        <div className="mt-6 rounded-2xl bg-white shadow-sm ring-1 font-sans ring-black/[0.06]">
+          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 px-4 sm:px-6 py-4 text-sm font-semibold text-[#273815] font-sans">
+            <div className="font-sans flex justify-center">Select</div>
+            <div className="font-sans">Product</div>
+            <div className="font-sans text-center">Quantity</div>
+            <div className="font-sans text-right">Price</div>
+            <div className="font-sans text-center">Action</div>
           </div>
         </div>
 
-        <ul className="space-y-4 mt-4">
-          {cartItems.map((item) => (
+        {cartItems.length === 0 ? (
+          <div className="mt-8 text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Your wishlist is empty</h3>
+            <p className="text-gray-500 mb-6">Save items you love for later</p>
+            <Link href="/product-catalog-sale" className="inline-flex items-center px-6 py-3 bg-[#636B2F] text-white rounded-full hover:bg-[#4A5A2A] transition-colors">
+              Start Shopping
+            </Link>
+          </div>
+        ) : (
+          <ul className="space-y-4 mt-4">
+            {cartItems.map((item) => (
             <li
               key={item.id}
               className="rounded-2xl font-sans bg-white shadow-sm ring-1 ring-black/[0.06] px-4 sm:px-6 py-4"
               
             >
               <div className="grid font-sans grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4">
-                <input
-                  aria-label="Select item"
-                  type="checkbox"
-                  checked={item.selected}
-                  onChange={() => toggleItemSelection(item.id)}
-                  className="size-4 font-sans accent-green-800"
-                />
+                <div className="flex justify-center">
+                  <input
+                    aria-label="Select item"
+                    type="checkbox"
+                    checked={item.selected}
+                    onChange={() => toggleItemSelection(item.id)}
+                    className="size-4 font-sans accent-green-800"
+                  />
+                </div>
 
                 <div className="flex items-center gap-4 min-w-0">
-                  <div className="size-14 font-sans  rounded-lg bg-neutral-100 ring-1 ring-black/[0.06] overflow-hidden flex items-center justify-center text-xs text-neutral-500 shrink-0" style={{ fontFamily: 'Fustat, Arial, Helvetica, sans-serif' }}>
+                  <div className="size-14 font-sans rounded-lg bg-neutral-100 ring-1 ring-black/[0.06] overflow-hidden flex items-center justify-center text-xs text-neutral-500 shrink-0" style={{ fontFamily: 'Fustat, Arial, Helvetica, sans-serif' }}>
                     {item.thumbnailSrc ? (
                       <Image
                         src={item.thumbnailSrc}
@@ -131,11 +148,11 @@ export default function WishlistPage() {
                         className="object-cover size-full"
                       />
                     ) : (
-                      <span className=" font-sans " >Image</span>
+                      <span className="font-sans">Image</span>
                     )}
                   </div>
                   <div className="truncate">
-                    <p className="truncate text-neutral-800  font-sans " >
+                    <p className="truncate text-neutral-800 font-sans">
                       {item.name}
                     </p>
                   </div>
@@ -149,7 +166,7 @@ export default function WishlistPage() {
                   >
                     <MinusIcon />
                   </IconButton>
-                  <span className="w-6 text-center select-none font-sans  font-medium">{item.quantity}</span>
+                  <span className="w-6 text-center select-none font-sans font-medium">{item.quantity}</span>
                   <IconButton
                     label="Increase quantity"
                     onClick={() => incrementQuantity(item.id)}
@@ -174,35 +191,22 @@ export default function WishlistPage() {
                 </div>
               </div>
             </li>
-          ))}
-        </ul>
+            ))}
+          </ul>
+        )}
 
-        <div className="mt-10 flex flex-col-reverse font-sans gap-4 sm:flex-row sm:items-center">
-          <div className="flex-1">
-            <div className="rounded-2xl font-sans bg-white shadow-sm ring-1 ring-black/[0.06] p-5" >
-              <div className="flex items-center justify-between">
-                <p className="text-xl font-semibold font-sans  text-neutral-800">Total :</p>
-                <p className="text-xl font-semibold font-sans  text-[#636B2F] tabular-nums" >
-                  {currency.format(cartTotal)}
-                </p>
-              </div>
-            </div>
-          </div>
-
+        <div className="mt-10 flex justify-end">
           <button
             onClick={() => setIsCheckoutOpen(true)}
             disabled={!someSelected}
             title={!someSelected ? 'Select at least one product to continue' : undefined}
-            className={`inline-flex font-sans items-center justify-center gap-2 rounded-full px-6 h-12 shrink-0 transition-colors ${someSelected ? 'bg-neutral-900 text-white hover:bg-neutral-800' : 'bg-neutral-300 text-neutral-500 cursor-not-allowed'}`}
-            aria-label="Buy now"
+            className={`inline-flex font-sans items-center justify-center gap-2 rounded-full px-8 h-12 shrink-0 transition-all duration-200 ${someSelected ? 'bg-[#636B2F] text-white hover:bg-[#4A5A2A] shadow-lg hover:shadow-xl' : 'bg-neutral-300 text-neutral-500 cursor-not-allowed'}`}
+            aria-label="Add to cart"
           >
-            <span className=" font-sans ">Add to Cart</span>
+            <span className="font-sans font-medium">Add to Cart</span>
           </button>
         </div>
 
-        {!someSelected && (
-          <p className="mt-2 font-sans text-sm text-neutral-500">Select at least one product to proceed to checkout.</p>
-        )}
 
         {isCheckoutOpen && (
           <CheckoutModal

@@ -10,7 +10,7 @@ import Navbar from '../../components/Navbar-Products';
 import WishlistSidebar from '../../components/WishlistSidebar';
 import CartSidebar from '../../components/CartSidebar';
 import ChatBubble from '../../components/ChatBubble';
-import { useCart } from '../../hooks/useCart';
+import { useCartContext } from '../../contexts/CartContext';
 import { saleProducts, newProducts, featuredProducts, forSwapProducts } from '../../data/products';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -84,9 +84,9 @@ export default function ItemViewSalePage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-
+  
   // Use shared hooks
-  const cart = useCart();
+  const cart = useCartContext();
   const wishlist = useWishlist();
   // Load product and lists
   useEffect(() => {
@@ -474,7 +474,22 @@ export default function ItemViewSalePage() {
                      {isLiked ? 'Liked' : 'Like'}
                    </div>
                  </button>
-                 <button className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-gray-100 text-gray-700 rounded-full font-medium hover:bg-gray-200 transition-colors text-sm sm:text-base">
+                 <button 
+                   onClick={() => {
+                     const cartItem = {
+                       id: Number(currentProduct.id),
+                       name: currentProduct.title,
+                       price: `₱${currentProduct.price.toLocaleString()}`,
+                       priceNum: currentProduct.price,
+                       location: currentProduct.location,
+                       image: currentProduct.image,
+                       category: currentProduct.material,
+                       quantity: 1
+                     };
+                     cart.addToCart(cartItem);
+                   }}
+                   className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-gray-100 text-gray-700 rounded-full font-medium hover:bg-gray-200 transition-colors text-sm sm:text-base"
+                 >
                    <div className="flex items-center justify-center gap-2">
                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -567,7 +582,19 @@ export default function ItemViewSalePage() {
                             {product.location}
                            </div>
                            <button 
-                            onClick={() => cart.addToCart(product as any)}
+                            onClick={() => {
+                              const cartItem = {
+                                id: Number(product.id),
+                                name: product.name,
+                                price: product.price,
+                                priceNum: parseFloat(product.price.replace(/[₱,\s]/g, '')),
+                                location: product.location,
+                                image: product.image,
+                                category: 'Similar Product',
+                                quantity: 1
+                              };
+                              cart.addToCart(cartItem);
+                            }}
                              className="p-1.5 sm:p-2 cursor-pointer rounded-full hover:bg-gray-100 transition-colors duration-200 transform hover:scale-110"
                            >
                              <img src="/icon/addtocart.png" alt="add to cart" className="w-auto h-5 sm:h-7" />

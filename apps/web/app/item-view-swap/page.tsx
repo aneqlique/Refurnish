@@ -4,13 +4,36 @@ import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useSearchParams, useRouter } from 'next/navigation';
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
+type BackendProduct = {
+  _id: string;
+  title: string;
+  description: string;
+  price?: number;
+  condition: string;
+  category: string;
+  images: string[];
+  location: string;
+  status: string;
+  material: string;
+  age: { value: number; unit: string };
+  listedAs: string;
+  swapWantedDescription?: string;
+  owner?: { 
+    _id: string;
+    email: string; 
+    firstName: string; 
+    lastName: string; 
+  };
+};
+
 type SwapProduct = {
-  id: number;
+  id: string;
   title: string;
   image: string;
   location: string;
@@ -24,15 +47,15 @@ type SwapProduct = {
 };
 
 type SaleProduct = {
-  id: number;
+  id: string;
   title: string;
   image: string;
   location: string;
   price: number;
 };
 
-const currentSwapProduct: SwapProduct = {
-  id: 1,
+const fallbackSwapProduct: SwapProduct = {
+  id: "1",
   title: "360° Swivel Wooden Office Chair",
   image: "/products/chair/view1.jpg",
   location: "Manila",
@@ -45,21 +68,68 @@ const currentSwapProduct: SwapProduct = {
   images: ["/products/chair/view1.jpg", "/products/chair/view2.jpg", "/products/chair/view4.jpg"]
 };
 
-const relatedSaleProducts: SaleProduct[] = [
-  { id: 2, title: "Folding Trolley", image: "/living.png", location: "Amanpulo", price: 12000 },
-  { id: 3, title: "Folding Trolley", image: "/dining.png", location: "Amanpulo", price: 12000 }
-];
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://refurnish-backend.onrender.com';
 
 export default function ItemViewSwapPage() {
   const navbarRef = useRef<HTMLElement>(null);
+  const searchParams = useSearchParams();
+  const [currentSwapProduct, setCurrentSwapProduct] = useState<SwapProduct>(fallbackSwapProduct);
+  const [relatedSaleProducts, setRelatedSaleProducts] = useState<SaleProduct[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
+
+  // Load product and related products
+  useEffect(() => {
+    const id = searchParams.get('id') || '';
+    if (!id) return;
+    const controller = new AbortController();
+
+    const fetchProduct = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/products/${id}`, { signal: controller.signal });
+        const p: BackendProduct = await res.json();
+        if (!res.ok || !p) return;
+        
+        const swapProduct: SwapProduct = {
+          id: p._id,
+          title: p.title,
+          image: Array.isArray(p.images) && p.images[0] ? p.images[0] : '/products/chair/view1.jpg',
+          location: p.location || 'Metro Manila',
+          wantItem: p.swapWantedDescription || 'Something interesting',
+          seller: p.owner ? [p.owner.firstName, p.owner.lastName].filter(Boolean).join(' ') || 'Seller' : 'Seller',
+          condition: p.condition,
+          material: p.material,
+          age: p.age ? `${p.age.value} ${p.age.unit}` : '—',
+          description: p.description,
+          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [Array.isArray(p.images) ? (p.images[0] || '/products/chair/view1.jpg') : '/products/chair/view1.jpg']
+        };
+        setCurrentSwapProduct(swapProduct);
+
+        // Fetch related sale products (same category, status listed, listedAs sale)
+        const relatedRes = await fetch(`${API_BASE_URL}/api/products?status=listed&listedAs=sale&category=${encodeURIComponent(p.category)}`, { signal: controller.signal });
+        const relatedData: BackendProduct[] = await relatedRes.json();
+        const related = (relatedData || []).slice(0, 2).map(x => ({
+          id: x._id,
+          title: x.title,
+          image: Array.isArray(x.images) && x.images[0] ? x.images[0] : '/living.png',
+          location: x.location || 'Metro Manila',
+          price: typeof x.price === 'number' ? x.price : 0,
+        }));
+        setRelatedSaleProducts(related);
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchProduct();
+    return () => controller.abort();
+  }, [searchParams]);
 
   useEffect(() => {
     if (!navbarRef.current) return;
     const navEl = navbarRef.current;
     const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
+      gsap.timeline({
         scrollTrigger: {
           trigger: "main",
           start: "top top",
@@ -288,20 +358,13 @@ export default function ItemViewSwapPage() {
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Related Products</h3>
                 <div className="space-y-3 sm:space-y-4">
                   {relatedSaleProducts.map((product) => (
-                    <Link key={product.id} href={`/item-view-sale/${product.id}`} className="block bg-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+                    <Link key={product.id} href={`/item-view-sale?id=${product.id}`} className="block bg-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
                       <div className="aspect-square">
                         <Image src={product.image} alt={product.title} width={300} height={300} className="w-full h-full object-cover" />
                       </div>
                       <div className="p-3 sm:p-4">
                         <h4 className="font-semibold text-sm sm:text-base lg:text-lg text-(--color-olive) mb-1">{product.title}</h4>
-                        <div className="bg-(--color-white) text-(--color-primary) rounded-lg sm:rounded-xl mb-2">
-                            <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                </svg>
-                                <span className="font-semibold text-xs sm:text-sm lg:text-base">Want: {currentSwapProduct.wantItem}</span>
-                            </div>
-                        </div>                        
+                        <div className="text-base sm:text-lg font-semibold text-(--color-olive) mb-2">₱ {product.price.toLocaleString()}</div>
                         <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
                           <img src="/icon/locateIcon.png" alt="Location" className="w-2 h-2 sm:w-3 sm:h-3" />
                           <span>{product.location}</span>

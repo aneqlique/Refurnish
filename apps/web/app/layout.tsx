@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../contexts/AuthContext";
+import { CartProvider } from "../contexts/CartContext";
 import SessionProvider from "../components/SessionProvider";
 import SiteVisitTracker from "../components/SiteVisitTracker";
 
@@ -40,8 +41,10 @@ export default function RootLayout({
       >
         <SessionProvider>
           <AuthProvider>
-            <SiteVisitTracker />
-            {children}
+            <CartProvider>
+              <SiteVisitTracker />
+              {children}
+            </CartProvider>
           </AuthProvider>
         </SessionProvider>
       </body>
