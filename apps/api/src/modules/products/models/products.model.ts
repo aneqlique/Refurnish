@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IProduct extends Document {
   title: string;
   description: string;
+  swapWantedDescription?: string; // What the seller wants in exchange (only for swap/both)
   price?: number; // Optional if the product is for swap
   quantity: number;
   condition: string;
@@ -10,7 +11,7 @@ export interface IProduct extends Document {
   images: string[];
   location: string;
   owner: mongoose.Schema.Types.ObjectId;
-  status: "for_sale" | "for_swap" | "both" | "sold" | "for_approval" | "listed"; // Added listed status
+  status: "sold" | "for_approval" | "listed"; // Added listed status
   material: "wood" | "plastic" | "steel";
   age: {
     value: number;
@@ -26,6 +27,12 @@ export interface IProduct extends Document {
 const ProductSchema: Schema = new Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, required: true },
+  swapWantedDescription: { 
+    type: String, 
+    required: function() {
+      return this.listedAs === 'swap' || this.listedAs === 'both';
+    }
+  }, // What the seller wants in exchange (required for swap/both)
   price: { type: Number, required: false }, // Made optional
   quantity: { type: Number, required: true, min: 1 },
   condition: { type: String, required: true },
@@ -36,7 +43,7 @@ const ProductSchema: Schema = new Schema({
   status: {
     type: String,
     required: true,
-    enum: ["for_sale", "for_swap", "both", "sold", "for_approval", "listed"],
+    enum: ["sold", "for_approval", "listed"],
   },
   material: {
     type: String,

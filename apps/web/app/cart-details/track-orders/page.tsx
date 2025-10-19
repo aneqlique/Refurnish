@@ -50,14 +50,28 @@ export default function TrackOrdersPage() {
         <CartTabs />
 
         <div className="mt-6 rounded-2xl bg-white font-sans shadow-sm ring-1 ring-black/[0.06]">
-          <div className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 sm:px-6 py-3 text-sm font-semibold text-[#273815] font-sans">
-            <div>Product</div>
-            <div className=" font-sans text-right">Status</div>
+          <div className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 sm:px-6 py-4 text-sm font-semibold text-[#273815] font-sans">
+            <div className="font-sans">Product</div>
+            <div className="font-sans text-right">Status</div>
           </div>
         </div>
 
-        <ul className="space-y-4 mt-4">
-          {orders.map((item) => (
+        {orders.length === 0 ? (
+          <div className="mt-8 text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No orders yet</h3>
+            <p className="text-gray-500 mb-6">Your order history will appear here</p>
+            <Link href="/product-catalog-sale" className="inline-flex items-center px-6 py-3 bg-[#636B2F] text-white rounded-full hover:bg-[#4A5A2A] transition-colors">
+              Start Shopping
+            </Link>
+          </div>
+        ) : (
+          <ul className="space-y-4 mt-4">
+            {orders.map((item) => (
             <li
               key={item.id}
               className="rounded-2xl  font-sans bg-white shadow-sm ring-1 ring-black/[0.06] px-4 sm:px-6 py-4"
@@ -84,13 +98,22 @@ export default function TrackOrdersPage() {
                     </p>
                   </div>
                 </div>
-                <div className=" font-sans text-right text-neutral-700">
-                  {item.status}
+                <div className="font-sans text-right">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                    item.status === 'Shipped out' ? 'bg-blue-100 text-blue-800' :
+                    item.status === 'Out for Delivery' ? 'bg-orange-100 text-orange-800' :
+                    item.status === 'Preparing to Ship' ? 'bg-yellow-100 text-yellow-800' :
+                    item.status === 'To Rate' ? 'bg-green-100 text-green-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {item.status}
+                  </span>
                 </div>
               </div>
             </li>
-          ))}
-        </ul>
+            ))}
+          </ul>
+        )}
       </main>
 
     {/* footer */}

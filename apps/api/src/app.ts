@@ -19,6 +19,8 @@ cloudinary.v2.config({
 import userRoutes from "./modules/users/routes/user.route";
 import productRoutes from "./modules/products/routes/products.route";
 import siteVisitRoutes from "./modules/site-visits/routes/site-visits.route";
+import cartRoutes from "./modules/carts/routes/cart.routes";
+import wishlistRoutes from "./modules/wishlists/routes/wishlist.routes";
 import sellerProfileRoutes from "./modules/users/routes/seller-profile.route";
 import messagesRoutes from "./modules/messages/routes/messages.route";
 
@@ -74,6 +76,8 @@ app.use("/api/users/seller", sellerProfileRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/site-visits", siteVisitRoutes);
 app.use("/api/chat", messagesRoutes);
+app.use("/api/carts", cartRoutes);
+app.use("/api/wishlists", wishlistRoutes);
 
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);

@@ -19,6 +19,7 @@ const UserSchema = new mongoose.Schema({
 const ProductSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, required: true },
+  swapWantedDescription: { type: String, required: false }, // What the seller wants in exchange
   price: { type: Number, required: false },
   condition: { type: String, required: true },
   category: { type: String, required: true },
@@ -28,7 +29,7 @@ const ProductSchema = new mongoose.Schema({
   status: {
     type: String,
     required: true,
-    enum: ["for_sale", "for_swap", "both", "sold", "for_approval"],
+    enum: ["listed", "sold", "for_approval"],
   },
   material: {
     type: String,
@@ -42,7 +43,7 @@ const ProductSchema = new mongoose.Schema({
   listedAs: {
     type: String,
     required: true,
-    enum: ["sale", "swap"],
+    enum: ["sale", "swap", "both"],
   },
   mode_of_payment: {
     type: String,
@@ -66,6 +67,7 @@ const sampleProducts = [
   {
     title: "Vintage Oak Dining Table",
     description: "Beautiful vintage oak dining table with intricate woodwork details. Perfect for family gatherings and dinner parties. Shows some signs of age but adds character to any home.",
+    swapWantedDescription: "Looking for a modern coffee table or bookshelf",
     price: 15000,
     condition: "Good",
     category: "Furniture",
@@ -74,13 +76,14 @@ const sampleProducts = [
     status: "for_approval",
     material: "wood",
     age: { value: 3, unit: "years" },
-    listedAs: "sale",
+    listedAs: "both",
     mode_of_payment: "bank",
     courier: "Lalamove"
   },
   {
     title: "Modern Steel Office Chair",
     description: "Ergonomic steel-framed office chair with adjustable height and lumbar support. Great for home office or workspace. Minimal wear, excellent condition.",
+    // No swapWantedDescription for sale-only products
     price: 8500,
     condition: "Excellent",
     category: "Office Furniture",
@@ -96,7 +99,8 @@ const sampleProducts = [
   {
     title: "Plastic Storage Cabinet",
     description: "Multi-purpose plastic storage cabinet with multiple compartments. Ideal for organizing clothes, books, or household items. Lightweight and easy to assemble.",
-    price: 3200,
+    swapWantedDescription: "Would love to trade for a wooden dresser or nightstand",
+    // No price for swap-only products
     condition: "Fair",
     category: "Storage",
     images: ["https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500"],
