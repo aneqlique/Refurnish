@@ -388,7 +388,8 @@ function CheckoutModal({
   // state for showing the separate payment modal
   
   const [paymentModalOpen, setPaymentModalOpen] = useState<boolean>(false);
-  const [paymentModalProps, setPaymentModalProps] = useState<PaymentModalPropsState>({ provider: "gcash" });
+  const [paymentModalProps, setPaymentModalProps] = useState<{ provider: string; txnId?: string }>({ provider: "gcash" });
+  // useState<PaymentModalPropsState>({ provider: "gcash" });
 
 
   const [selection, setSelection] = useState({
@@ -397,6 +398,10 @@ function CheckoutModal({
   cardType: "debit",
   deliveryMode: "LBC Express",
   });
+
+  const [notice, setNotice] = useState<{ type: "info" | "error" | "success"; message: string } | null>(null);
+  const [cardValid, setCardValid] = useState(false);
+  const [attemptedCardSubmit, setAttemptedCardSubmit] = useState(false);
 
   function handlePlaceOrder() {
     // If user selected an e-wallet, open the payment mockup modal
@@ -414,15 +419,39 @@ function CheckoutModal({
 
       // Option B: (preferred UX) close checkout then open payment modal:
       // onClose(); 
-      // setTimeout(() => setPaymentModalOpen(true), 160);
+      // setTimeout(() => setPaymentModalOpen(true));
       return;
     }
 
-    alert("Proceed with non-ewallet payment (demo)");
-    // Non-ewallet flow (COD or card): keep your existing logic here
-    // submitOrder(); or whatever you do
-  }
+    // Cash on Delivery: treat as immediate order placement success
+    if (selection.paymentMode === "Cash on Delivery") {
+      const txnId = `cod_${Date.now().toString(36).slice(-8)}`;
+      handlePaymentSuccess({ status: "SOLD", txnId, amount: total });
+      return;
+    }
 
+    // Debit/Credit: require valid card inputs before proceeding
+    if (selection.paymentMode === "Debit/Credit") {
+      setAttemptedCardSubmit(true);
+      if (!cardValid) {
+        // Errors are shown inline in PaymentDeliverySelector
+        return;
+      }
+      const txnId = `card_${Date.now().toString(36).slice(-8)}`;
+      handlePaymentSuccess({ status: "SOLD", txnId, amount: total });
+      return;
+    }
+  }
+  function handlePaymentSuccess(payload: { status: "SOLD"; txnId: string; amount: number }) {
+    console.log("Payment success", payload);
+    // 1) Close payment modal
+    setPaymentModalOpen(false);
+    // 2) Show success notice, close checkout after user acknowledges
+    setNotice({ type: "success", message: "Your order has been placed successfully." });
+    // 3) Update your item statuses to SOLD
+    //    Example: setItems(prev => prev.map(i => ({...i, status: 'SOLD'})))
+    //    Or call your backend to mark order as paid and update cart state.
+  }
 
   return (
     <div className="fixed inset-0 font-sans z-50 flex items-center justify-center ">
@@ -473,7 +502,7 @@ function CheckoutModal({
           <div className="space-y-6">
             <div className="space-y-4">
             
-              <PaymentDeliverySelector onChange={(s) => setSelection(s)} />
+              <PaymentDeliverySelector onChange={(s) => setSelection(s)} attemptedSubmit={attemptedCardSubmit} onValidityChange={setCardValid} />
 
               <div>
                 <p className="text-neutral-700 font-medium">Refurnish Voucher :</p>
@@ -500,11 +529,25 @@ function CheckoutModal({
               amount={total}                         // subtotal + shippingFee
               provider={paymentModalProps.provider}  // 'gcash' or 'paymaya'
               txnId={paymentModalProps.txnId}
+              onSuccess={handlePaymentSuccess}
             />
 
                
           </div>
         </div>
+
+        {notice && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setNotice(null)} />
+            <div className="relative mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" style={{ fontFamily: 'Fustat, Arial, Helvetica, sans-serif' }}>
+              <h3 className="text-lg font-semibold text-neutral-800 mb-2">{notice.type === 'error' ? 'Something went wrong' : notice.type === 'success' ? 'Successful checkout!' : 'Notice'}</h3>
+              <p className="text-sm text-neutral-700">{notice.message}</p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button onClick={() => { setNotice(null); onClose(); }} className="h-10 px-4 rounded-full bg-neutral-900 text-white">OK</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <button aria-label="Close" onClick={onClose} className="absolute top-4 right-4 size-9 rounded-full hover:bg-neutral-100 flex items-center justify-center">
           <CloseIcon />
@@ -609,7 +652,7 @@ function FacebookIcon() {
   );
 }
 
-function PaymentDeliverySelector({ onChange }: { onChange?: (s: any) => void }) {
+function PaymentDeliverySelector({ onChange, attemptedSubmit = false, onValidityChange }: { onChange?: (s: any) => void; attemptedSubmit?: boolean; onValidityChange?: (valid: boolean) => void }) {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [deliveryOpen, setDeliveryOpen] = useState(false);
 
@@ -618,6 +661,13 @@ function PaymentDeliverySelector({ onChange }: { onChange?: (s: any) => void }) 
   const [cardType, setCardType] = useState("debit");
 
   const [deliveryMode, setDeliveryMode] = useState("LBC Express");
+
+  // Card inputs and errors
+  const [cardName, setCardName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState(""); // MM/YY
+  const [cardCvc, setCardCvc] = useState("");
+  const [cardErrors, setCardErrors] = useState<{ name?: string; number?: string; expiry?: string; cvc?: string }>({});
 
   const paymentRef = useRef<HTMLDivElement | null>(null);
   const deliveryRef = useRef<HTMLDivElement | null>(null);
@@ -641,6 +691,69 @@ function PaymentDeliverySelector({ onChange }: { onChange?: (s: any) => void }) 
       onChange({ paymentMode, ewalletOption, cardType, deliveryMode });
     }
   }, [paymentMode, ewalletOption, cardType, deliveryMode, onChange]);
+
+  // Validation helpers
+  function luhnCheck(num: string) {
+    let sum = 0;
+    let shouldDouble = false;
+    for (let i = num.length - 1; i >= 0; i--) {
+      let digit = parseInt(num.charAt(i), 10);
+      if (shouldDouble) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      shouldDouble = !shouldDouble;
+    }
+    return sum % 10 === 0;
+  }
+
+  function validateCard(): { valid: boolean; errors: typeof cardErrors } {
+    if (paymentMode !== "Debit/Credit") return { valid: true, errors: {} };
+    const errors: typeof cardErrors = {};
+    const digits = cardNumber.replace(/\D/g, "");
+
+    if (!cardName.trim()) {
+      errors.name = "Cardholder name is required.";
+    }
+
+    if (digits.length < 13 || digits.length > 19 || !luhnCheck(digits)) {
+      errors.number = "Enter a valid card number.";
+    }
+
+    // expiry MM/YY and not past
+    const match = cardExpiry.match(/^\s*(\d{2})\/(\d{2})\s*$/);
+    if (!match) {
+      errors.expiry = "Enter expiry as MM/YY.";
+    } else {
+      const mm = parseInt(match[1], 10);
+      const yy = parseInt(match[2], 10);
+      if (mm < 1 || mm > 12) {
+        errors.expiry = "Invalid expiry month.";
+      } else {
+        const now = new Date();
+        const curYY = now.getFullYear() % 100;
+        const curMM = now.getMonth() + 1;
+        if (yy < curYY || (yy === curYY && mm < curMM)) {
+          errors.expiry = "Card is expired.";
+        }
+      }
+    }
+
+    if (!/^\d{3,4}$/.test(cardCvc)) {
+      errors.cvc = "CVC must be 3–4 digits.";
+    }
+
+    return { valid: Object.keys(errors).length === 0, errors };
+  }
+
+  // Recompute validity on relevant changes and report to parent
+  useEffect(() => {
+    const { valid, errors } = validateCard();
+    setCardErrors(errors);
+    if (typeof onValidityChange === "function") onValidityChange(valid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentMode, cardName, cardNumber, cardExpiry, cardCvc]);
 
   const paymentOptions = ["Cash on Delivery", "Ewallet", "Debit/Credit"];
   const ewalletOptions = [
@@ -735,17 +848,20 @@ function PaymentDeliverySelector({ onChange }: { onChange?: (s: any) => void }) 
 
           {paymentMode === "Debit/Credit" && (
             <div className="rounded-xl ring-1 ring-black/[0.06] p-3 bg-white">
-              <div className="flex items-center justify-between mb-2">
+              {attemptedSubmit && Object.keys(cardErrors).length > 0 && (
+                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm" role="alert" style={{ fontFamily: 'Fustat, Arial, Helvetica, sans-serif' }}>
+                  Please correct the highlighted card details.
+                </div>
+              )}
 
+              <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-medium text-neutral-700">Card type:</p>
                 <div className="flex items-center gap-2">
                   <img src="/icon/visa.png" alt="Visa" className="h-5" />
                   <img src="/icon/card.png" alt="Mastercard" className="h-5" />
                 </div>
               </div>
-              
-              
-              
+
               <div className="flex gap-4 items-center">
                 <label className="inline-flex items-center gap-2">
                   <input
@@ -770,27 +886,66 @@ function PaymentDeliverySelector({ onChange }: { onChange?: (s: any) => void }) 
               </div>
 
               <div className="mt-3 grid grid-cols-1 gap-2">
-                <input
-                  placeholder="Cardholder name"
-                  className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
-                />
-                <input
-                  placeholder="Card number"
-                  inputMode="numeric"
-                  maxLength={20}
-                  className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm tabular-nums"
-                />
+                <div>
+                  <input
+                    placeholder="Cardholder name"
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value)}
+                    className={`w-full rounded-md border px-3 py-2 text-sm ${attemptedSubmit && cardErrors.name ? 'border-red-300' : 'border-neutral-200'}`}
+                  />
+                  {attemptedSubmit && cardErrors.name && (
+                    <p className="mt-1 text-xs text-red-600">{cardErrors.name}</p>
+                  )}
+                </div>
+                <div>
+                  <input
+                    placeholder="Card number"
+                    inputMode="numeric"
+                    maxLength={23}
+                    value={cardNumber}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 19);
+                      // group in 4s
+                      const grouped = digits.replace(/(.{4})/g, '$1 ').trim();
+                      setCardNumber(grouped);
+                    }}
+                    className={`w-full rounded-md border px-3 py-2 text-sm tabular-nums ${attemptedSubmit && cardErrors.number ? 'border-red-300' : 'border-neutral-200'}`}
+                  />
+                  {attemptedSubmit && cardErrors.number && (
+                    <p className="mt-1 text-xs text-red-600">{cardErrors.number}</p>
+                  )}
+                </div>
                 <div className="flex gap-2">
-                  <input
-                    placeholder="MM/YY"
-                    maxLength={5}
-                    className="w-1/2 rounded-md border border-neutral-200 px-3 py-2 text-sm"
-                  />
-                  <input
-                    placeholder="CVC"
-                    maxLength={3}
-                    className="w-1/2 rounded-md border border-neutral-200 px-3 py-2 text-sm tabular-nums"
-                  />
+                  <div className="w-1/2">
+                    <input
+                      placeholder="MM/YY"
+                      maxLength={5}
+                      value={cardExpiry}
+                      onChange={(e) => {
+                        let v = e.target.value.replace(/[^\d]/g, '').slice(0, 4);
+                        if (v.length >= 3) v = v.slice(0,2) + '/' + v.slice(2);
+                        else if (v.length >= 1 && parseInt(v[0],10) > 1) v = '0' + v[0] + (v[1] ? '/' + v.slice(1) : '');
+                        setCardExpiry(v);
+                      }}
+                      className={`w-full rounded-md border px-3 py-2 text-sm ${attemptedSubmit && cardErrors.expiry ? 'border-red-300' : 'border-neutral-200'}`}
+                    />
+                    {attemptedSubmit && cardErrors.expiry && (
+                      <p className="mt-1 text-xs text-red-600">{cardErrors.expiry}</p>
+                    )}
+                  </div>
+                  <div className="w-1/2">
+                    <input
+                      placeholder="CVC"
+                      inputMode="numeric"
+                      maxLength={4}
+                      value={cardCvc}
+                      onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0,4))}
+                      className={`w-full rounded-md border px-3 py-2 text-sm tabular-nums ${attemptedSubmit && cardErrors.cvc ? 'border-red-300' : 'border-neutral-200'}`}
+                    />
+                    {attemptedSubmit && cardErrors.cvc && (
+                      <p className="mt-1 text-xs text-red-600">{cardErrors.cvc}</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

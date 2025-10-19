@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect , useRef, useState} from "react";
 
 interface PaymentMockupModalProps {
   open: boolean;
@@ -6,6 +6,8 @@ interface PaymentMockupModalProps {
   amount: number | string;
   provider?: "gcash" | "paymaya" | string; // optional, default 'gcash'
   txnId?: string;
+  onSuccess?: (result: { status: "SOLD"; txnId: string; amount: number }) => void;
+
 }
 
 export default function PaymentMockupModal({
@@ -14,6 +16,7 @@ export default function PaymentMockupModal({
   amount,
   provider = "gcash",
   txnId,
+  onSuccess,
 }: PaymentMockupModalProps) {
   // don't render when closed
   if (!open) return null;
@@ -36,17 +39,53 @@ export default function PaymentMockupModal({
   const gcashLogo = "/icon/gcash.png"; // optional small logos
   const paymayaLogo = "/icon/pmaya.png";
 
+  const [step, setStep] = useState<"login" | "confirm">("login");
+  const [mobile, setMobile] = useState("");
+  const [error, setError] = useState("");
+  const [refId, setRefId] = useState(txnId || `txn_${Date.now().toString(36).slice(-8)}`);
+
+
   // simple focus management: focus first input when modal opens
   useEffect(() => {
-    const input = document.querySelector<HTMLInputElement>("#gcash-input");
+    if (step === "login"){
+    const input = document.querySelector<HTMLInputElement>("#payment-mockup-first-input");
     if (input) (input).focus();
+    }
     // lock scroll on body while modal open
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, []);
+  }, [step]);
+
+  const isPhoneValid = () => {
+    const digits = mobile.replace(/\D/g, "");
+    // assume local PH mobile w/o +63 is 10 digits (e.g., 9123456789)
+    return digits.length === 10;
+  };
+
+  function handleNext() {
+    if (!isPhoneValid()) {
+      setError("Please enter a valid 10-digit mobile number (without +63).");
+      return;
+    }
+    // generate a new ref id for the confirmation screen (or reuse txnId)
+    const newRef = txnId || `ref_${Date.now().toString(36).slice(-8)}`;
+    setRefId(newRef);
+    setStep("confirm");
+  }
+
+  function handleProceed() {
+    // call onSuccess with payload so parent can close checkout & update status
+    if (typeof onSuccess === "function") {
+      onSuccess({ status: "SOLD", txnId: refId, amount: parsedAmount });
+    }
+    // close the payment modal itself
+    onClose();
+  }
+
+
 
   return (
     <div
@@ -97,6 +136,7 @@ export default function PaymentMockupModal({
             </div>
 
             <div className="p-6 overflow-auto">
+              {step === "login" && (
               <div className="rounded-md bg-white shadow-xl border-b border-gray-200 ">
                 <div className="p-5 border-b border-gray-100">
                   <div className="flex items-center justify-between text-sm text-gray-500">
@@ -116,6 +156,11 @@ export default function PaymentMockupModal({
                   <h3 className="text-center text-gray-700 font-semibold mb-4">
                     Login to pay with GCash
                   </h3>
+                  {error && (
+                    <div className="mb-4 rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm" role="alert" style={{ fontFamily: 'Fustat, Arial, Helvetica, sans-serif' }}>
+                      {error}
+                    </div>
+                  )}
 
                 <div className="mb-4">
                     <div className="flex items-center border border-gray-200 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-blue-200">
@@ -123,20 +168,97 @@ export default function PaymentMockupModal({
                         <input
                         id="payment-mockup-first-input"
                         type="tel"
+                        inputMode="numeric"
                         placeholder="Mobile number"
+                        maxLength={10}
                         className="w-full px-4 py-3 text-sm outline-none"
+                        value={mobile}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          if (error) setError("");
+                          setMobile(digits);
+                        }}
+                        onKeyDown={(e) => {
+                          const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Home", "End"];
+                          if (allowed.includes(e.key)) return;
+                          if (!/^[0-9]$/.test(e.key)) {
+                            e.preventDefault();
+                          }
+                        }}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          const pasted = (e.clipboardData || (window as any).clipboardData).getData('text');
+                          const digits = String(pasted).replace(/\D/g, '').slice(0, 10);
+                          setMobile((prev) => (prev + digits).slice(0, 10));
+                        }}
                         />
                     </div>
+                     <p className="text-xs text-gray-500 mt-2">
+                      Enter mobile number without the leading zero. e.g. <i>9123456789</i>
+                    </p>
                 </div>
+                
 
 
-                  <button className="w-full py-3 rounded-full bg-blue-500 text-white font-semibold">
+                  <button onClick={handleNext} className="w-full py-3 rounded-full bg-blue-500 text-white font-semibold">
                     NEXT
                   </button>
                 </div>
+                
+                  <div className="mt-6 text-center text-sm text-gray-500">
+                    Don't have a GCash account?{" "}
+                    <a href="#" className="text-blue-200 underline">
+                      Register now
+                    </a>
+                  </div>
               </div>
 
-              <div className="mt-6 text-center text-sm text-gray-500">
+              )}
+               {step === "confirm" && (
+                <div className="rounded-md bg-white shadow-sm shadow-xl border-b border-gray-200 p-4">
+                  <div className="p-2 border-b border-gray-200 mb-4">
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <div>Merchant</div>
+                      <div className="font-medium text-gray-800">Refurnish</div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="text-sm text-gray-500">Amount Due</div>
+                      <div className="text-lg font-semibold text-blue-600">
+                        {formatter.format(parsedAmount)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Confirm card showing total, ref id, and proceed */}
+                  <div className="bg-white p-6 rounded-md shadow-inner text-center">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-sm text-gray-500">Total</div>
+                      <div className="text-lg font-semibold">{formatter.format(parsedAmount)}</div>
+                    </div>
+
+                    <div className="mb-4 text-sm text-gray-600">Reference No.</div>
+                    <div className="mb-4 font-mono text-sm text-gray-800">{refId}</div>
+
+                    <button
+                      onClick={handleProceed}
+                      className="w-full py-3 rounded-full bg-blue-600 text-white font-semibold"
+                    >
+                      Proceed
+                    </button>
+                  </div>
+
+                  <div className="mt-4 text-sm text-gray-500 text-center">
+                    Redirecting you back to merchant after proceed...
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+
+              {/* <div className="mt-6 text-center text-sm text-gray-500">
                 Don't have a GCash account?{" "}
                 <a href="#" className="text-blue-200 underline">
                   Register now
@@ -144,7 +266,7 @@ export default function PaymentMockupModal({
               </div>
             </div>
           </>
-        )}
+        )} */}
 
         {/* Provider: PayMaya (QR) */}
         {provider === "paymaya" && (
@@ -193,8 +315,8 @@ export default function PaymentMockupModal({
                     </div>
                   </div>
 
-                  <button className="w-full mt-3 py-3 rounded-full bg-green-600 text-white font-semibold">
-                    I PAID — VERIFY
+                  <button onClick={handleProceed} className="w-full mt-3 py-3 rounded-full bg-green-600 text-white font-semibold">
+                    PROCEED TO MERCHANT
                   </button>
                 </div>
               </div>
