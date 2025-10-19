@@ -15,8 +15,15 @@ export interface IUser extends Document {
   address?: string;
   birthday?: Date;
   gender?: 'male' | 'female' | 'other';
+  customGender?: string;
   lastActive?: Date;
   isOnline?: boolean;
+  followers?: string[];
+  following?: string[];
+  followerCount?: number;
+  followingCount?: number;
+  followersPublic?: boolean;
+  followingPublic?: boolean;
   generateAuthToken(): string;
 }
 
@@ -33,8 +40,15 @@ const UserSchema: Schema = new Schema({
   address: { type: String },
   birthday: { type: Date },
   gender: { type: String, enum: ['male', 'female', 'other'], required: false },
+  customGender: { type: String },
   lastActive: { type: Date, default: Date.now },
   isOnline: { type: Boolean, default: false },
+  followers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  following: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  followerCount: { type: Number, default: 0 },
+  followingCount: { type: Number, default: 0 },
+  followersPublic: { type: Boolean, default: true },
+  followingPublic: { type: Boolean, default: true },
 }, {
   timestamps: true
 });

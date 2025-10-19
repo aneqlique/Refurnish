@@ -3,12 +3,12 @@ import React, { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Menu, Users, MoreVertical, Search, CheckCircle, XCircle, Eye, Clock, User, Mail, Phone, MapPin, FileText, Store } from 'lucide-react';
+import { Menu, Users, MoreVertical, Search, CheckCircle, XCircle, Eye, Clock, User, Mail, Phone, MapPin, FileText, Store, ChevronDown, ChevronRight, Settings, LayoutDashboard, PackageCheck } from 'lucide-react';
 import { Montserrat } from 'next/font/google';
 import { useRouter } from 'next/navigation';
-import { LogOut, LayoutDashboard, PackageCheck } from "lucide-react";
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { useAuth } from '../../../contexts/AuthContext';
+import AdminSidebar from '../../../components/AdminSidebar';
 
 const montserrat = Montserrat({
   subsets: ['latin'],
@@ -58,6 +58,13 @@ const SellerManagementPage: React.FC = () => {
   const [selectedSeller, setSelectedSeller] = useState<SellerRow | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  
+  // Shop approval states
+  const [activeTab, setActiveTab] = useState<'sellers' | 'shop-approvals'>('sellers');
+  const [pendingShopChanges, setPendingShopChanges] = useState<any[]>([]);
+  const [shopApprovalLoading, setShopApprovalLoading] = useState(false);
+  const [reason, setReason] = useState('');
+  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
 
   // Close action menu when clicking outside
   useEffect(() => {
@@ -73,12 +80,6 @@ const SellerManagementPage: React.FC = () => {
     return () => document.removeEventListener('click', onDocClick);
   }, [openMenuIndex]);
 
-  const navItems = [
-    { label: 'Dashboard Overview', href: '/admin/dashboard', active: false, icon: <LayoutDashboard className="w-5 h-5 text-gray-500" /> },
-    { label: 'User Management', href: '/admin/user-management', active: false, icon: <Users className="w-5 h-5 text-gray-500" /> },
-    { label: 'Seller Management', href: '/admin/seller-management', active: true, icon: <PackageCheck className="w-5 h-5 text-gray-500" /> },
-    { label: 'Product Moderation', href: '/admin/product-moderation', active: false, icon: <PackageCheck className="w-5 h-5 text-gray-500" /> },
-  ];
 
   const filteredSellers = sellers.filter(seller => {
     const matchesFilter = filter === 'all' || seller.status === filter;
@@ -132,6 +133,99 @@ const SellerManagementPage: React.FC = () => {
     fetchSellers();
     return () => controller.abort();
   }, [token, API_BASE_URL, currentPage, pageSize, search]);
+
+  // Fetch pending shop changes
+  const fetchPendingShopChanges = async () => {
+    if (!token) return;
+    
+    try {
+      setShopApprovalLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/seller/pending-changes`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setPendingShopChanges(data);
+      } else {
+        console.error('Failed to fetch pending shop changes');
+      }
+    } catch (e) {
+      console.error('Error fetching pending shop changes:', e);
+    } finally {
+      setShopApprovalLoading(false);
+    }
+  };
+
+  // Handle shop approval
+  const handleShopApprove = async (id: string) => {
+    if (!token) return;
+    
+    setActionLoading(id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/seller/${id}/approve-changes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason }),
+      });
+
+      if (res.ok) {
+        setPendingShopChanges(prev => prev.filter(item => item._id !== id));
+        setReason('');
+        setSelectedShopId(null);
+      } else {
+        const errorData = await res.json();
+        console.error(errorData.message || 'Failed to approve changes');
+      }
+    } catch (e) {
+      console.error('Error approving changes:', e);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Handle shop rejection
+  const handleShopReject = async (id: string) => {
+    if (!token) return;
+    
+    setActionLoading(id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/seller/${id}/reject-changes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason }),
+      });
+
+      if (res.ok) {
+        setPendingShopChanges(prev => prev.filter(item => item._id !== id));
+        setReason('');
+        setSelectedShopId(null);
+      } else {
+        const errorData = await res.json();
+        console.error(errorData.message || 'Failed to reject changes');
+      }
+    } catch (e) {
+      console.error('Error rejecting changes:', e);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Fetch shop changes when tab is active
+  useEffect(() => {
+    if (activeTab === 'shop-approvals') {
+      fetchPendingShopChanges();
+    }
+  }, [activeTab, token]);
 
   const handleApprove = async (sellerId: string) => {
     try {
@@ -211,82 +305,8 @@ const SellerManagementPage: React.FC = () => {
 
   return (
     <ProtectedRoute requireAdmin={true}>
-      <div className='fixed top-0 left-0 h-screen w-80 bg-white shadow-sm"'> 
-      <div className="w-80 bg-white shadow-sm h-screen flex flex-col">
-        <div className="p-6 border-b flex-grow">
-          {/* Header */}
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center">
-              <Image src="/Rf-logo.svg" alt="Rf" width={40} height={40} />
-            </div>
-            <span className="text-lg font-medium text-gray-700">Admin Access</span>
-          </div>
-
-          {/* Admin Profile */}
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-[#636B2F] rounded-full flex items-center justify-center overflow-hidden">
-              {user?.profilePicture ? (
-                <Image 
-                  src={user.profilePicture} 
-                  alt={`${user.firstName} ${user.lastName}`}
-                  width={48}
-                  height={48}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.currentTarget as HTMLImageElement;
-                    const nextElement = target.nextElementSibling as HTMLElement;
-                    target.style.display = 'none';
-                    if (nextElement) nextElement.style.display = 'flex';
-                  }}
-                />
-              ) : null}
-              <span className={`${user?.profilePicture ? 'hidden' : 'flex'} items-center justify-center w-full h-full text-white font-semibold text-lg`}>
-                {user?.firstName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'A'}
-              </span>
-            </div>
-            <div>
-              <div className="font-semibold text-gray-900">
-                {user?.firstName} {user?.lastName}
-              </div>
-              <div className="text-sm text-gray-500">Administrator</div>
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="mt-8">
-            <div className="px-2">
-              <div className="px-4 text-xs font-medium tracking-wider text-gray-500 mb-3">NAVIGATION</div>
-              
-              <div className="space-y-2">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className={`flex items-center gap-2 px-3 py-3 rounded-lg text-sm transition-colors ${
-                      item.active 
-                        ? 'bg-gray-100 text-gray-900 font-semibold' 
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="w-4 h-4">{item.icon}</span>
-                    <span>{item.label}</span>
-                  </Link>
-                ))}
-              </div>
-
-            </div>
-          </nav>
-        </div>
-        <div className="p-6 border-t border-gray-200 mt-auto">
-          <button onClick={() => router.push('/')} className="w-full cursor-pointer flex items-center justify-start gap-2 px-4 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-            <LogOut className="w-5 h-5 text-gray-500" />
-            <span>Log out</span>
-          </button>
-        </div>
-      </div>
-    </div>
-    
-    <div className={`${montserrat.className} flex min-h-screen bg-gray-50`}>
+      <div className={`${montserrat.className} flex min-h-screen bg-gray-50`}>
+        <AdminSidebar activePage="seller-management" />
       {/* Main Content */}
       <div className="flex-1 ml-80 p-8 overflow-y-auto">
         {/* Header */}
@@ -295,9 +315,38 @@ const SellerManagementPage: React.FC = () => {
           <h1 className="text-xl font-semibold text-gray-900">Seller Management</h1>
         </div>
 
-        {/* Sellers Title and Search */}
-        <div className="mb-6">  
-            <h2 className="text-base font-semibold text-gray-900 mb-3">Sellers ({filteredSellers.length})</h2>
+        {/* Tab Navigation */}
+        <div className="mb-6">
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+            <button
+              onClick={() => setActiveTab('sellers')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'sellers'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              All Sellers ({filteredSellers.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('shop-approvals')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'shop-approvals'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Shop Approvals ({pendingShopChanges.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'sellers' && (
+          <>
+            {/* Sellers Title and Search */}
+            <div className="mb-6">  
+                <h2 className="text-base font-semibold text-gray-900 mb-3">Sellers ({filteredSellers.length})</h2>
           <div className="relative max-w-xl">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="w-4 h-4 text-gray-400" />
@@ -485,8 +534,8 @@ const SellerManagementPage: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+          </>
+        )}
 
     {/* Seller Details Modal */}
     {showDetailsModal && selectedSeller && (
@@ -729,6 +778,220 @@ const SellerManagementPage: React.FC = () => {
         </div>
       </div>
     )}
+
+        {/* Shop Approvals Tab */}
+        {activeTab === 'shop-approvals' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Shop Information Approvals</h2>
+              <button
+                onClick={fetchPendingShopChanges}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {shopApprovalLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-white rounded-lg p-6 shadow animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+                    <div className="space-y-2">
+                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : pendingShopChanges.length === 0 ? (
+              <div className="bg-white rounded-lg shadow p-8 text-center">
+                <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending Changes</h3>
+                <p className="text-gray-600">All shop information changes have been reviewed.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {pendingShopChanges.map((change) => (
+                  <div key={change._id} className="bg-white rounded-lg shadow-lg p-6">
+                    <div className="flex items-start justify-between mb-6">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                          {change.userId.profilePicture ? (
+                            <img
+                              src={change.userId.profilePicture}
+                              alt="Profile"
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                          ) : (
+                            <User className="w-6 h-6 text-gray-600" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {change.userId.firstName} {change.userId.lastName}
+                          </h3>
+                          <p className="text-gray-600">{change.userId.email}</p>
+                          <p className="text-sm text-gray-500">Submitted: {new Date(change.updatedAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                          <Clock className="w-4 h-4 mr-1" />
+                          Pending Review
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                      {/* Current Information */}
+                      <div>
+                        <h4 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+                          <Store className="w-5 h-5 mr-2 text-gray-600" />
+                          Current Information
+                        </h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Shop Name</label>
+                            <p className="text-gray-900">{change.shopName}</p>
+                          </div>
+                          {change.address && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Address</label>
+                              <p className="text-gray-900">{change.address}</p>
+                            </div>
+                          )}
+                          {change.detailedAddress && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Detailed Address</label>
+                              <p className="text-gray-900">{change.detailedAddress}</p>
+                            </div>
+                          )}
+                          {change.contactNumber && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Contact Number</label>
+                              <p className="text-gray-900">{change.contactNumber}</p>
+                            </div>
+                          )}
+                          {change.transactionOptions && change.transactionOptions.length > 0 && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Transaction Options</label>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {change.transactionOptions.map((option: string, index: number) => (
+                                  <span key={index} className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">
+                                    {option}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Proposed Changes */}
+                      <div>
+                        <h4 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+                          <Store className="w-5 h-5 mr-2 text-green-600" />
+                          Proposed Changes
+                        </h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Shop Name</label>
+                            <p className="text-gray-900 bg-green-50 p-2 rounded">
+                              {change.pendingChanges.shopName || change.shopName}
+                            </p>
+                          </div>
+                          {change.pendingChanges.address && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Address</label>
+                              <p className="text-gray-900 bg-green-50 p-2 rounded">
+                                {change.pendingChanges.address}
+                              </p>
+                            </div>
+                          )}
+                          {change.pendingChanges.detailedAddress && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Detailed Address</label>
+                              <p className="text-gray-900 bg-green-50 p-2 rounded">
+                                {change.pendingChanges.detailedAddress}
+                              </p>
+                            </div>
+                          )}
+                          {change.pendingChanges.contactNumber && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Contact Number</label>
+                              <p className="text-gray-900 bg-green-50 p-2 rounded">
+                                {change.pendingChanges.contactNumber}
+                              </p>
+                            </div>
+                          )}
+                          {change.pendingChanges.transactionOptions && change.pendingChanges.transactionOptions.length > 0 && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Transaction Options</label>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {change.pendingChanges.transactionOptions.map((option: string, index: number) => (
+                                  <span key={index} className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
+                                    {option}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="border-t pt-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 mr-4">
+                          <input
+                            type="text"
+                            placeholder="Reason for approval/rejection (optional)"
+                            value={selectedShopId === change._id ? reason : ''}
+                            onChange={(e) => {
+                              setReason(e.target.value);
+                              setSelectedShopId(change._id);
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div className="flex space-x-3">
+                          <button
+                            onClick={() => handleShopApprove(change._id)}
+                            disabled={actionLoading === change._id}
+                            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {actionLoading === change._id ? (
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                            ) : (
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                            )}
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleShopReject(change._id)}
+                            disabled={actionLoading === change._id}
+                            className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {actionLoading === change._id ? (
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                            ) : (
+                              <XCircle className="w-4 h-4 mr-2" />
+                            )}
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
     </ProtectedRoute>
   );
 };

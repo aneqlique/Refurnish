@@ -4,8 +4,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Users, TrendingUp, ShoppingBag, Clock, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Montserrat } from 'next/font/google';
-import { LogOut, LayoutDashboard, PackageCheck } from "lucide-react";
 import { useAuth } from '../../../contexts/AuthContext';
+import { useAdminSession } from '../../../hooks/useAdminSession';
+import AdminSidebar from '../../../components/AdminSidebar';
 import {
   LineChart,
   Line,
@@ -54,6 +55,12 @@ const AdminDashboard: React.FC = () => {
   ]);
   const [analyticsRangeLabel, setAnalyticsRangeLabel] = useState<string>("");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date | null>(null);
+  // Initialize admin session handler
+  useAdminSession({
+    maxInactiveTime: 30 * 60 * 1000, // 30 minutes
+    warningTime: 5 * 60 * 1000, // 5 minutes warning
+    checkInterval: 60 * 1000, // Check every minute
+  });
 
   // Function to fetch user count
   const fetchUserCount = useCallback(async () => {
@@ -238,11 +245,6 @@ const AdminDashboard: React.FC = () => {
     fetchWeeklyAnalytics(next);
   };
 
-  const navItems = [
-   { label: 'Dashboard Overview', href: '/admin/dashboard', active: true, icon: <LayoutDashboard className="w-5 h-5 text-gray-500" /> },
-  { label: 'User Management', href: '/admin/user-management', active: false, icon: <Users className="w-5 h-5 text-gray-500" /> },
-  { label: 'Product Moderation', href: '/admin/product-moderation', active: false, icon: <PackageCheck className="w-5 h-5 text-gray-500" /> },
-];
 
   const stats: StatCard[] = [
     { title: "Users", value: isLoadingUserCount ? "..." : userCount.toString(), icon: <Users className="w-5 h-5" />, color: "text-purple-600", bgColor: "bg-purple-100" },
@@ -253,90 +255,10 @@ const AdminDashboard: React.FC = () => {
 
   const chartData = weeklyChartData;
 
-  // Logout
-  const handleLogout = () => {
-    logout();
-  };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <div className="fixed top-0 left-0 h-screen w-80 bg-white shadow-sm">
-        <div className="w-80 bg-white shadow-sm h-screen flex flex-col">
-        <div className="p-6 border-b flex-grow">
-          {/* Header */}
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center">
-              <Image src="/Rf-logo.svg" alt="Rf" width={40} height={40} />
-            </div>
-            <span className="text-lg font-medium text-gray-700">Admin Access</span>
-          </div>
-
-          {/* Admin Profile */}
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-[#636B2F] rounded-full flex items-center justify-center overflow-hidden">
-              {user?.profilePicture ? (
-                <Image 
-                  src={user.profilePicture} 
-                  alt={`${user.firstName} ${user.lastName}`}
-                  width={48}
-                  height={48}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    // Fallback to initials if image fails to load
-                    const target = e.currentTarget as HTMLImageElement;
-                    const nextElement = target.nextElementSibling as HTMLElement;
-                    target.style.display = 'none';
-                    if (nextElement) nextElement.style.display = 'flex';
-                  }}
-                />
-              ) : null}
-              <span className={`${user?.profilePicture ? 'hidden' : 'flex'} items-center justify-center w-full h-full text-white font-semibold text-lg`}>
-                {user?.firstName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'A'}
-              </span>
-            </div>
-            <div>
-              <div className="font-semibold text-gray-900">
-                {user?.firstName} {user?.lastName}
-              </div>
-              <div className="text-sm text-gray-500">Administrator</div>
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="mt-8">
-            <div className="px-2">
-              <div className="px-4 text-xs font-medium tracking-wider text-gray-500 mb-3">NAVIGATION</div>
-              
-              <div className="space-y-2">
-                {navItems.map((item) => (
-                 
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className={`flex items-center gap-2 px-3 py-3 rounded-lg text-sm transition-colors ${
-                      item.active 
-                        ? 'bg-gray-100 text-gray-900 font-semibold' 
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="w-4 h-4">{item.icon}</span>
-                    <span>{item.label}</span>
-                  </Link>
-
-                ))}
-              </div>
-
-            </div>
-          </nav>
-        </div>
-        <div className="p-6 border-t border-gray-200 mt-auto">
-          <button onClick={handleLogout} className="w-full cursor-pointer flex items-center justify-start gap-2 px-4 py-3 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-            <LogOut className="w-5 h-5 text-gray-500" />
-            <span>Log out</span>
-          </button>
-        </div>
-        </div>
-      </div>
+      <AdminSidebar activePage="dashboard" />
 
       {/* Main Content */}
       <div className={`${montserrat.className} flex-1 ml-80 p-8 overflow-y-auto`}>

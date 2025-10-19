@@ -1,12 +1,15 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { MessagesSkeleton, ChatMessagesSkeleton } from '../../../components/SkeletonLoader';
+import { useSearchParams } from 'next/navigation';
 import io from 'socket.io-client';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://refurnish-backend.onrender.com';
 
 export default function ProfileMessagesPage() {
   const { token, user } = useAuth();
+  const searchParams = useSearchParams();
   const [socket, setSocket] = useState<any>(null);
   const [convos, setConvos] = useState<any[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -21,9 +24,13 @@ export default function ProfileMessagesPage() {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const [sentMessageIds, setSentMessageIds] = useState<Set<string>>(new Set());
   const [unreadMessages, setUnreadMessages] = useState<Map<string, number>>(new Map());
+  const [activeUsers, setActiveUsers] = useState<Set<string>>(new Set());
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   useEffect(() => {
     if (!token) return;
+    setIsLoadingConversations(true);
     fetch(`${API_BASE_URL}/api/chat/conversations`, {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     }).then(r => r.json()).then((conversations) => {
@@ -38,7 +45,71 @@ export default function ProfileMessagesPage() {
         unreadMap.set(conv._id, 0);
       });
       setUnreadMessages(unreadMap);
-    }).catch(()=>{});
+      setIsLoadingConversations(false);
+    }).catch(()=>{
+      setIsLoadingConversations(false);
+    });
+  }, [token]);
+
+  // Handle conversation parameter from URL
+  useEffect(() => {
+    const conversationId = searchParams.get('conversation');
+    console.log('URL conversation parameter:', conversationId);
+    console.log('Available conversations:', convos.map(c => c._id));
+    
+    if (conversationId && convos.length > 0) {
+      // Check if the conversation exists in the loaded conversations
+      const conversationExists = convos.some(conv => conv._id === conversationId);
+      console.log('Conversation exists:', conversationExists);
+      
+      if (conversationExists) {
+        console.log('Setting active conversation to:', conversationId);
+        setActiveId(conversationId);
+      }
+    }
+  }, [searchParams, convos]);
+
+  // Fetch active users periodically
+  useEffect(() => {
+    if (!token) return;
+    
+    const fetchActiveUsers = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/users/active`, {
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const users = await res.json();
+          const activeUserIds = new Set<string>(users.map((u: any) => u._id || u.id).filter(Boolean));
+          setActiveUsers(activeUserIds);
+        }
+      } catch (e) {
+        console.error('Failed to fetch active users:', e);
+      }
+    };
+
+    // Update current user activity
+    const updateActivity = async () => {
+      try {
+        await fetch(`${API_BASE_URL}/api/users/activity`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        });
+      } catch (e) {
+        console.error('Failed to update activity:', e);
+      }
+    };
+
+    // Fetch immediately
+    fetchActiveUsers();
+    updateActivity();
+    
+    // Then every 30 seconds
+    const interval = setInterval(() => {
+      fetchActiveUsers();
+      updateActivity();
+    }, 30000);
+    return () => clearInterval(interval);
   }, [token]);
 
   useEffect(() => {
@@ -90,11 +161,17 @@ export default function ProfileMessagesPage() {
     socket.emit('join_chat', activeId);
     
     // Clear sent message IDs when switching conversations
-    setSentMessageIds(new Set());
-    
-    fetch(`${API_BASE_URL}/api/chat/conversations/${activeId}/messages`, {
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    }).then(r => r.json()).then(setMessages).catch(()=>{});
+      setSentMessageIds(new Set());
+      
+      setIsLoadingMessages(true);
+      fetch(`${API_BASE_URL}/api/chat/conversations/${activeId}/messages`, {
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      }).then(r => r.json()).then((data) => {
+        setMessages(data);
+        setIsLoadingMessages(false);
+      }).catch(()=>{
+        setIsLoadingMessages(false);
+      });
 
     // Mark conversation as read when viewing it
     setReadConversations(prev => new Set([...prev, activeId]));
@@ -141,6 +218,17 @@ export default function ProfileMessagesPage() {
           newMap.set(conversationId, currentCount + 1);
           return newMap;
         });
+      } else if (conversationId === activeId) {
+        // Message is for current conversation but from someone else - mark as unread if not from current user
+        if (msg.sender !== user?.id) {
+          console.log('Message from other user in current conversation, marking as unread');
+          setUnreadMessages(prev => {
+            const newMap = new Map(prev);
+            const currentCount = newMap.get(conversationId) || 0;
+            newMap.set(conversationId, currentCount + 1);
+            return newMap;
+          });
+        }
       } else {
         console.log('Message not added - either wrong conversation, duplicate, or sent by us');
       }
@@ -312,12 +400,11 @@ export default function ProfileMessagesPage() {
   }, [recipientEmail, token]);
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 ml-0 md:ml-[300px]">
-      <div className="w-full max-w-[1200px] mx-auto py-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden" style={{ height: '70vh' }}>
+    <div className="px-4 pt-8 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden" style={{ height: '80vh' }}>
           <div className="grid grid-cols-1 md:grid-cols-3 h-full">
             {/* Conversations list */}
-            <div className="border-r p-4 overflow-y-auto">
+            <div className={`border-r p-4 overflow-y-auto ${activeId ? 'hidden md:block' : 'block'}`}>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold text-gray-900">Messages</h2>
                 <button onClick={()=> setShowComposer(v=>!v)} className="px-3 py-1 rounded-full bg-(--color-green) text-white text-sm">New</button>
@@ -364,14 +451,21 @@ export default function ProfileMessagesPage() {
                   </div>
                 </div>
               )}
-              <div className="space-y-2">
-                {convos.map((c) => {
+                <div className="space-y-2">
+                 {isLoadingConversations ? (
+                   <MessagesSkeleton />
+                 ) : (
+                   convos.map((c) => {
                   const participants = c.participants || c.users || c.members || [];
                   const meId = user?.id;
                   const other = participants.find((p: any) => (p?._id || p?.id) !== meId) || {};
+                  const otherId = other._id || other.id;
                   const displayName = [other.firstName, other.lastName].filter(Boolean).join(' ') || other.name || other.email || 'Conversation';
                   const email = other.email || '';
                   const avatar = other.profilePicture;
+                  const isActive = otherId && activeUsers.has(otherId);
+                  const unreadCount = unreadMessages.get(c._id) || 0;
+                  
                   return (
                     <button key={c._id} onClick={() => setActiveId(c._id)} className={`w-full text-left px-3 py-2 rounded-lg border ${activeId===c._id?'border-(--color-olive) bg-green-50':'border-gray-200 hover:bg-gray-50'}`}>
                       <div className="flex items-center gap-3">
@@ -391,38 +485,129 @@ export default function ProfileMessagesPage() {
                                 {other.role}
                               </span>
                             )}
-                            <span className="text-xs text-green-600 font-medium">Active now</span>
+                            {isActive ? (
+                              <span className="text-xs text-green-600 font-medium">Active now</span>
+                            ) : (
+                              <span className="text-xs text-gray-500">Offline</span>
+                            )}
                           </div>
                           {email && <div className="text-xs text-gray-500 truncate">{email}</div>}
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           {/* New message indicator - only show if there are unread messages */}
-                          {unreadMessages.has(c._id) && unreadMessages.get(c._id)! > 0 && (
+                          {unreadCount > 0 && (
                             <div className="w-3 h-3 rounded-full bg-red-500"></div>
                           )}
                         </div>
                       </div>
                     </button>
-                  );
-                })}
-                {convos.length===0 && <div className="text-sm text-gray-500">No conversations yet</div>}
+                    );
+                   })
+                 )}
+                 {!isLoadingConversations && convos.length===0 && <div className="text-sm text-gray-500">No conversations yet</div>}
               </div>
             </div>
 
             {/* Chat area */}
-            <div className="col-span-2 relative" style={{ height: '100%' }}>
+            <div className={`${activeId ? 'block' : 'hidden md:block'} col-span-2 relative`} style={{ height: '100%' }}>
+              {/* Mobile back to conversations */}
+              <div className="md:hidden sticky top-0 left-0 right-0 z-10 bg-white border-b px-3 py-2 flex items-center gap-3">
+                <button
+                  onClick={() => setActiveId(null)}
+                  className="px-3 py-1 text-sm rounded border border-gray-300 text-gray-700"
+                >
+                  Back
+                </button>
+                <div className="text-sm text-gray-900 font-medium">Conversation</div>
+              </div>
+              
+              {/* Chat Header - Profile info like Reddit */}
+              {activeId && (
+                <div className="sticky top-0 left-0 right-0 z-10 bg-white border-b px-4 py-3 flex items-center justify-between">
+                  {(() => {
+                    const participants = convos.find(c => c._id === activeId)?.participants || [];
+                    const meId = user?.id;
+                    const other = participants.find((p: any) => (p?._id || p?.id) !== meId) || {};
+                    const displayName = [other.firstName, other.lastName].filter(Boolean).join(' ') || other.email || 'User';
+                    const userEmail = other.email || '';
+                    const isActive = activeUsers.has(other._id || other.id);
+                    
+                    return (
+                      <>
+                        <div 
+                          className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors group"
+                          onClick={() => window.open(`/user-profile/${userEmail}`, '_blank')}
+                          title="View Profile"
+                        >
+                          <div className="relative">
+                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                              {other.profilePicture ? (
+                                <img
+                                  src={other.profilePicture}
+                                  alt={displayName}
+                                  className="w-full h-full object-cover rounded-full"
+                                />
+                              ) : (
+                                <span className="text-lg font-bold text-gray-600">
+                                  {displayName.charAt(0).toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+                            {isActive && (
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-base font-semibold text-gray-900 group-hover:text-green-600 transition-colors">{displayName}</div>
+                            <div className="text-sm text-gray-500">
+                              {isActive ? 'Active now' : 'Last seen recently'}
+                            </div>
+                          </div>
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => window.open(`/user-profile/${userEmail}`, '_blank')}
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            title="View Profile"
+                          >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </button>
+                          <button
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            title="More options"
+                          >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
               {/* Messages area - scrollable */}
               <div 
-                className="absolute top-0 left-0 right-0 bg-gray-50" 
+                className="absolute left-0 right-0 bg-gray-50"
                 style={{ 
-                  height: 'calc(100% - 80px)', 
+                  top: activeId ? '80px' : '0px',
+                  height: activeId ? 'calc(100% - 160px)' : 'calc(100% - 80px)', 
                   overflowY: 'auto',
                   padding: '16px'
                 }}
               >
                 <div className="space-y-3">
                   {activeId ? (
-                    messages.length>0 ? (
+                    isLoadingMessages ? (
+                      <ChatMessagesSkeleton />
+                    ) : messages.length>0 ? (
                       <>
                         {messages.map((m, idx) => {
                         const created = new Date(m.createdAt || m.timestamp || m.updatedAt || Date.now());
@@ -466,7 +651,7 @@ export default function ProfileMessagesPage() {
               {error && <div className="p-3 text-xs text-red-600">{error}</div>}
             </div>
           </div>
-        </div>
+        
       </div>
     </div>
   );

@@ -232,9 +232,9 @@ export default function Home() {
             <p className="text-(--color-black) mb-8 font-light leading-relaxed text-[14px] md:text-[15px]">
               Enjoy a 10% discount on your first two furniture purchases when you sign up today.
             </p>
-            <Link href='/login'>
+            <Link href='/shop'>
             <button className="bg-(--color-olive) hover:text-(--color-white) hover:bg-(--color-primary) hover:font-bold hover:translate-y-1 hover:tracking-[0.15em] tracking-[0.1em] text-white px-8 py-4 rounded-full font-normal cursor-pointer transition-modern text-[12px] md:text-[14px]">
-              SIGN UP NOW &nbsp; ➤
+             SHOP NOW &nbsp; ➤
             </button>
             </Link>
           </div>

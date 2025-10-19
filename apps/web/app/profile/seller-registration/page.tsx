@@ -56,15 +56,10 @@ export default function SellerRegistrationPage() {
           if (data.governmentId2Back) newPreviews.governmentId2Back = data.governmentId2Back;
           setPreviews(newPreviews);
           // If already submitted and not rejected, prevent resubmission and further edits/uploads
-          if (data.status === 'pending' || data.status === 'approved') {
+          if (data.status && data.status !== 'rejected') {
             setSuccess(`Submitted for approval${data.status ? ` (${data.status})` : ''}`);
             setIsLocked(true);
           }
-        } else {
-          // No profile yet
-          setIsLocked(false);
-          setSuccess('');
-          setPreviews({});
         }
       } catch {}
     };
@@ -142,17 +137,14 @@ export default function SellerRegistrationPage() {
 
   if (user?.role === 'seller') {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 ml-0 md:ml-[300px]">
-        <div className="w-full max-w-[1200px] mx-auto py-6">
-          <div className="bg-white rounded-2xl border p-6">You are already a seller. Go to Seller Dashboard.</div>
-        </div>
+      <div className="w-full max-w-[1200px] mx-auto py-6">
+        <div className="bg-white rounded-2xl border p-6">You are already a seller. Go to Seller Dashboard.</div>
       </div>
     );
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 ml-0 md:ml-[300px]">
-      <div className="w-full max-w-[1200px] mx-auto py-6">
+    <div className="w-full max-w-[1200px] mx-auto py-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
           <div className="p-6 border-b">
             <div className="flex items-center justify-between">
@@ -257,7 +249,6 @@ export default function SellerRegistrationPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }
 

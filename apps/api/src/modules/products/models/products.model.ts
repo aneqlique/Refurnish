@@ -4,6 +4,7 @@ export interface IProduct extends Document {
   title: string;
   description: string;
   price?: number; // Optional if the product is for swap
+  quantity: number;
   condition: string;
   category: string;
   images: string[];
@@ -15,15 +16,18 @@ export interface IProduct extends Document {
     value: number;
     unit: "years" | "months" | "days";
   };
-  listedAs: "sale" | "swap";
+  listedAs: "sale" | "swap" | "both";
   mode_of_payment: "cash" | "bank" | "gcash/maya";
   courier: "J&T Express" | "Lalamove" | "LBC Express";
+  swapWantedCategory?: string;
+  swapWantedDescription?: string;
 }
 
 const ProductSchema: Schema = new Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, required: true },
   price: { type: Number, required: false }, // Made optional
+  quantity: { type: Number, required: true, min: 1 },
   condition: { type: String, required: true },
   category: { type: String, required: true },
   images: { type: [String], required: true },
@@ -46,7 +50,7 @@ const ProductSchema: Schema = new Schema({
   listedAs: {
     type: String,
     required: true,
-    enum: ["sale", "swap"],
+    enum: ["sale", "swap", "both"],
   },
   mode_of_payment: {
     type: String,
@@ -58,6 +62,8 @@ const ProductSchema: Schema = new Schema({
     required: true,
     enum: ["J&T Express", "Lalamove", "LBC Express"],
   },
+  swapWantedCategory: { type: String, required: false },
+  swapWantedDescription: { type: String, required: false },
 }, {
   timestamps: true
 });

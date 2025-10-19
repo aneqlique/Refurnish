@@ -25,7 +25,7 @@ const UserProfileSidebar = ({ isMobileMenuOpen = false, setIsMobileMenuOpen }: U
       id: user?.role === 'seller' ? 'Seller Dashboard' : 'Seller Registration', 
       label: user?.role === 'seller' ? 'Seller Dashboard' : 'Seller Registration', 
       icon: Settings, 
-      href: user?.role === 'seller' ? '/profile/seller-dashboard' : '/profile/seller-registration'
+      href: user?.role === 'seller' ? '/profile/seller-dashboard-access' : '/profile/seller-registration'
     },
     { 
       id: 'Messages', 

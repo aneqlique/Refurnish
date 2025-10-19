@@ -39,6 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasRestoredFromStorage, setHasRestoredFromStorage] = useState(false);
   const router = useRouter();
   const { data: session, status } = useSession();
 
@@ -47,10 +48,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Sync NextAuth session with AuthContext
   useEffect(() => {
-    console.log('AuthContext: Session status changed', { status, session });
+    console.log('AuthContext: Session status changed', { 
+      status, 
+      hasSession: !!session, 
+      hasBackendUser: !!session?.backendUser,
+      hasRestoredFromStorage,
+      currentUser: user?.email,
+      currentToken: !!token
+    });
     
     if (status === 'loading') {
+      console.log('AuthContext: NextAuth is loading, setting isLoading to true');
       setIsLoading(true);
+      return;
+    }
+
+    // If we've already restored from localStorage, don't override unless NextAuth has a valid session
+    if (hasRestoredFromStorage && !session?.backendUser) {
+      console.log('AuthContext: Already restored from localStorage, skipping NextAuth override');
+      setIsLoading(false);
       return;
     }
 
@@ -86,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         } catch {}
       })();
-    } else if (status === 'unauthenticated') {
+    } else if (status === 'unauthenticated' && !hasRestoredFromStorage) {
       console.log('AuthContext: User unauthenticated, clearing state');
       setUser(null);
       setToken(null);
@@ -95,20 +111,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     setIsLoading(false);
-  }, [session, status]);
+  }, [session, status, hasRestoredFromStorage]);
 
-  // Initialize auth state from localStorage (only if not using NextAuth)
+  // Initialize auth state from localStorage on mount (for page refresh)
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      const storedToken = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
-      
-      if (storedToken && storedUser) {
+    console.log('AuthContext: Running localStorage restoration useEffect');
+    const storedToken = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    
+    console.log('AuthContext: Stored data check', { 
+      hasToken: !!storedToken, 
+      hasUser: !!storedUser,
+      tokenPreview: storedToken?.substring(0, 20) + '...',
+      userPreview: storedUser ? JSON.parse(storedUser).email : 'N/A'
+    });
+    
+    if (storedToken && storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        console.log('AuthContext: Setting user and token from localStorage', { email: parsedUser.email, role: parsedUser.role });
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        setUser(parsedUser);
+        setHasRestoredFromStorage(true);
+        console.log('AuthContext: Successfully restored user from localStorage', parsedUser);
+      } catch (error) {
+        console.error('AuthContext: Error parsing stored user', error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
       }
+    } else {
+      console.log('AuthContext: No stored auth data found');
     }
-  }, [status]);
+    
+    // Set loading to false after checking localStorage
+    console.log('AuthContext: Setting isLoading to false');
+    setIsLoading(false);
+  }, []); // Run only on mount
+
+  // Clear localStorage when NextAuth session is unauthenticated
+  useEffect(() => {
+    if (status === 'unauthenticated' && !user && !token) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
+  }, [status, user, token]);
 
   const login = async (email: string, password: string, adminSecret?: string) => {
     try {
@@ -310,3 +356,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

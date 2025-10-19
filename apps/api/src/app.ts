@@ -2,6 +2,18 @@ import express from "express";
 import http from "http";
 import cors from "cors";
 import { Server as SocketIOServer } from "socket.io";
+import cloudinary from "cloudinary";
+import dotenv from "dotenv";
+
+// Load environment variables
+dotenv.config();
+
+// Configure Cloudinary
+cloudinary.v2.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 //Feature routes imports
 import userRoutes from "./modules/users/routes/user.route";
@@ -33,15 +45,6 @@ app.get("/", (req, res) => {
   res.send("Refurnish E-commerce API is running");
 });
 
-//API routes registration
-app.use("/api/users", userRoutes);
-// Expose seller endpoints under two prefixes for compatibility
-app.use("/api/seller", sellerProfileRoutes);
-app.use("/api/users/seller", sellerProfileRoutes);
-app.use("/api/products", productRoutes);
-app.use("/api/site-visits", siteVisitRoutes);
-app.use("/api/chat", messagesRoutes);
-
 //Socket.io setup
 const httpServer = http.createServer(app);
 const io = new SocketIOServer(httpServer, {
@@ -57,6 +60,21 @@ const io = new SocketIOServer(httpServer, {
   }
 });
 
+// Middleware to attach io to requests
+app.use((req, res, next) => {
+  (req as any).io = io;
+  next();
+});
+
+//API routes registration
+app.use("/api/users", userRoutes);
+// Expose seller endpoints under two prefixes for compatibility
+app.use("/api/seller", sellerProfileRoutes);
+app.use("/api/users/seller", sellerProfileRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/site-visits", siteVisitRoutes);
+app.use("/api/chat", messagesRoutes);
+
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
@@ -71,6 +89,17 @@ io.on("connection", (socket) => {
     if (roomId) {
       io.to(roomId).emit("receive_message", message);
     }
+  });
+
+  // Seller dashboard events
+  socket.on("join_seller_dashboard", (userId) => {
+    socket.join(`seller_${userId}`);
+    console.log(`Seller ${userId} joined dashboard`);
+  });
+
+  socket.on("join_admin_dashboard", () => {
+    socket.join("admin_dashboard");
+    console.log(`Admin joined dashboard`);
   });
 
   socket.on("disconnect", () => {
