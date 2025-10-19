@@ -3,7 +3,6 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IProduct extends Document {
   title: string;
   description: string;
-  swapWantedDescription?: string; // What the seller wants in exchange (only for swap/both)
   price?: number; // Optional if the product is for swap
   quantity: number;
   condition: string;
@@ -21,7 +20,7 @@ export interface IProduct extends Document {
   mode_of_payment: "cash" | "bank" | "gcash/maya";
   courier: "J&T Express" | "Lalamove" | "LBC Express";
   swapWantedCategory?: string;
-  swapWantedDescription?: string;
+  swapWantedDescription?: string; // What the seller wants in exchange (only for swap/both)
 }
 
 const ProductSchema: Schema = new Schema({
@@ -70,7 +69,6 @@ const ProductSchema: Schema = new Schema({
     enum: ["J&T Express", "Lalamove", "LBC Express"],
   },
   swapWantedCategory: { type: String, required: false },
-  swapWantedDescription: { type: String, required: false },
 }, {
   timestamps: true
 });

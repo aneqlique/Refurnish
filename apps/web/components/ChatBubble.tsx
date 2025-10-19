@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { MessagesSkeleton, ChatMessagesSkeleton } from './SkeletonLoader';
-import { X, Send, MessageCircle, LogIn, Plus } from 'lucide-react';
+import { X, Send, MessageCircle, LogIn, Plus, RefreshCw } from 'lucide-react';
 import io from 'socket.io-client';
 
 interface ChatBubbleProps {
@@ -392,6 +392,11 @@ export default function ChatBubble({ className = "", sellerId, sellerName = "Sel
         } else {
           console.log('ChatBubble socket not available or not connected:', { socket: !!socket, connected: socket?.connected });
         }
+        
+        // Fallback: Check for new messages after a short delay
+        setTimeout(() => {
+          refreshMessages();
+        }, 1000);
       } else {
         const errorData = await res.json();
         setError(errorData.error || 'Failed to send message');
@@ -724,6 +729,13 @@ export default function ChatBubble({ className = "", sellerId, sellerName = "Sel
                             <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                             </svg>
+                          </button>
+                          <button
+                            onClick={refreshMessages}
+                            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                            title="Refresh messages"
+                          >
+                            <RefreshCw className="w-4 h-4 text-gray-600" />
                           </button>
                           <button
                             onClick={() => setIsChatOpen(false)}

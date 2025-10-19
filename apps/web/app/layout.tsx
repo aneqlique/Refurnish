@@ -46,12 +46,10 @@ export default function RootLayout({
             <CartProvider>
               <WishlistProvider>
                 <SiteVisitTracker />
+                <ActivityTracker />
                 {children}
               </WishlistProvider>
             </CartProvider>
-            <SiteVisitTracker />
-            <ActivityTracker />
-            {children}
           </AuthProvider>
         </SessionProvider>
       </body>
