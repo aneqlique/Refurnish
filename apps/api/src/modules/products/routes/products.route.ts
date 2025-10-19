@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   uploadProduct,
   getProducts,
+  getProductsByUser,
   getProductById,
   updateProduct,
   deleteProduct,
@@ -11,6 +12,9 @@ import {
   getProductsForApproval,
   moderateProduct,
   getMonthlyEarnings,
+  uploadImage,
+  createProduct,
+  markProductAsSold,
 } from "../controllers/products.controller";
 import authMiddleware from "../../../middleware/auth";
 import multer from "multer";
@@ -20,6 +24,8 @@ const upload = multer({ dest: "uploads/" });
 const productRoutes = Router();
 
 productRoutes.get("/", getProducts);
+
+productRoutes.get("/user/:userId", getProductsByUser);
 
 productRoutes.get("/total-sales", getTotalSales);
 productRoutes.get("/earnings/monthly", getMonthlyEarnings);
@@ -35,6 +41,25 @@ productRoutes.post(
   authMiddleware,
   upload.single("image"),
   uploadProduct
+);
+
+productRoutes.post(
+  "/upload-image",
+  authMiddleware,
+  upload.single("image"),
+  uploadImage
+);
+
+productRoutes.post(
+  "/create",
+  authMiddleware,
+  createProduct
+);
+
+productRoutes.put(
+  "/:id/sold",
+  authMiddleware,
+  markProductAsSold
 );
 
 productRoutes.put("/:id", authMiddleware, updateProduct);

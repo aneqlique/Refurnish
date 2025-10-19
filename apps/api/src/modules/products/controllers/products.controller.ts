@@ -2,26 +2,43 @@ import { Request, Response } from "express";
 import cloudinary from "cloudinary";
 import Product, { IProduct } from "../models/products.model";
 import SiteVisit from "../../site-visits/models/site-visits.model";
+import User from "../../users/models/user.model";
+import { sendProductApprovalEmail, sendProductSoldEmail } from "../../../utils/emailService";
 
 declare global {
   namespace Express {
     interface Request {
-      file?: any;
+      file?: Express.Multer.File;
     }
   }
 }
 
 export const uploadProduct = async (req: Request, res: Response) => {
   try {
-    const { title, description, price, condition, category, location, status } =
-      req.body;
+    const {
+      title,
+      description,
+      price,
+      quantity,
+      condition,
+      category,
+      location,
+      status,
+      material,
+      ageValue,
+      ageUnit,
+      listedAs,
+      mode_of_payment,
+      courier,
+    } = req.body as any;
     const image = req.file;
 
     if (!image) {
       return res.status(400).json({ error: "Image file is required." });
     }
 
-    if (status === "for_sale" && !price) {
+    const effectiveStatus = status || "for_approval";
+    if (effectiveStatus === "for_sale" && !price) {
       return res
         .status(400)
         .json({ error: "Price is required for a product for sale." });
@@ -35,14 +52,26 @@ export const uploadProduct = async (req: Request, res: Response) => {
     const newProduct: IProduct = new Product({
       title,
       description,
-      price: status === "for_sale" || status === "both" ? price : undefined,
+      price:
+        effectiveStatus === "for_sale" || effectiveStatus === "both"
+          ? Number(price) || undefined
+          : undefined,
+      quantity: Number(quantity) || 1,
       condition,
-      category,
+      category: category ? category.toUpperCase() : category,
       location,
       images: [result.secure_url],
-      owner: req.user._id,
-      status,
-    });
+      owner: (req as any).user._id,
+      status: effectiveStatus,
+      material,
+      age: {
+        value: Number(ageValue) || 0,
+        unit: ageUnit || "months",
+      },
+      listedAs: (listedAs === 'sale' || listedAs === 'swap') ? listedAs : 'sale',
+      mode_of_payment: mode_of_payment || 'cash',
+      courier: courier || 'J&T Express',
+    } as any);
 
     await newProduct.save();
 
@@ -82,6 +111,16 @@ export const getProducts = async (req: Request, res: Response) => {
   }
 };
 
+export const getProductsByUser = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const products = await Product.find({ owner: userId }).populate("owner", "email firstName lastName");
+    res.status(200).json(products);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch user products" });
+  }
+};
+
 // --- Missing Controller Functions ---
 
 export const getProductById = async (req: Request, res: Response) => {
@@ -99,37 +138,6 @@ export const getProductById = async (req: Request, res: Response) => {
   }
 };
 
-export const updateProduct = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const updatedProduct = await Product.findByIdAndUpdate(id, req.body, {
-      new: true,
-      runValidators: true,
-    });
-    if (!updatedProduct) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-    res.status(200).json({
-      message: "Product updated successfully!",
-      product: updatedProduct,
-    });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to update product" });
-  }
-};
-
-export const deleteProduct = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const deletedProduct = await Product.findByIdAndDelete(id);
-    if (!deletedProduct) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-    res.status(200).json({ message: "Product deleted successfully!" });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to delete product" });
-  }
-};
 
 // Get total sales from sold products
 export const getTotalSales = async (req: Request, res: Response) => {
@@ -206,6 +214,12 @@ export const moderateProduct = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid action. Must be 'approve' or 'reject'" });
     }
 
+    // Get the product with owner information before updating
+    const product = await Product.findById(id).populate('owner', 'email firstName lastName');
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
     let updateData: any = {};
     
     if (action === "approve") {
@@ -221,10 +235,50 @@ export const moderateProduct = async (req: Request, res: Response) => {
     const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
-    });
+    }).populate('owner', 'email firstName lastName');
 
     if (!updatedProduct) {
       return res.status(404).json({ error: "Product not found" });
+    }
+
+    // Send email notification for approval
+    if (action === "approve" && updatedProduct.owner) {
+      try {
+        const owner = updatedProduct.owner as any;
+        const shopName = owner.firstName || 'Seller';
+        const emailResult = await sendProductApprovalEmail(owner.email, updatedProduct.title, shopName);
+        
+        if (emailResult.success) {
+          console.log(`✅ Approval email sent to ${owner.email} for product: ${updatedProduct.title}`);
+        } else {
+          console.log(`📧 Email service not configured - approval notification skipped for ${owner.email}`);
+        }
+      } catch (emailError) {
+        console.error('Failed to send approval email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    // Emit WebSocket event for real-time updates
+    if ((req as any).io) {
+      const io = (req as any).io;
+      const ownerId = updatedProduct.owner.toString();
+      
+      // Emit to the specific seller
+      io.to(`seller_${ownerId}`).emit('product_status_update', {
+        productId: updatedProduct._id,
+        status: updatedProduct.status,
+        action: action,
+        message: `Your product "${updatedProduct.title}" has been ${action}d`
+      });
+
+      // Also emit to admin dashboard
+      io.to('admin_dashboard').emit('product_moderation_update', {
+        productId: updatedProduct._id,
+        status: updatedProduct.status,
+        action: action,
+        product: updatedProduct
+      });
     }
 
     res.status(200).json({
@@ -329,5 +383,318 @@ export const getWeeklyAnalytics = async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Error building weekly analytics:', err);
     res.status(500).json({ error: 'Failed to build weekly analytics' });
+  }
+};
+
+export const updateProduct = async (req: Request, res: Response) => {
+  try {
+    console.log('=== UPDATE PRODUCT REQUEST ===');
+    console.log('Product ID:', req.params.id);
+    console.log('User from request:', (req as any).user);
+    console.log('User ID:', (req as any).user?._id);
+    
+    const { id } = req.params;
+    const {
+      title,
+      description,
+      price,
+      quantity,
+      condition,
+      category,
+      location,
+      material,
+      ageValue,
+      ageUnit,
+      listedAs,
+      mode_of_payment,
+      courier,
+      swapWantedCategory,
+      swapWantedDescription,
+    } = req.body as any;
+
+    const product = await Product.findById(id).populate('owner', 'email firstName lastName');
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    // Check if user owns the product
+    const productOwnerId = (product.owner as any)._id ? (product.owner as any)._id.toString() : product.owner.toString();
+    const userId = (req as any).user._id.toString();
+    console.log(`Product owner ID: ${productOwnerId}`);
+    console.log(`User ID: ${userId}`);
+    console.log(`Owner match: ${productOwnerId === userId}`);
+    
+    if (productOwnerId !== userId) {
+      console.log(`Authorization failed: Product owner ${productOwnerId} !== User ${userId}`);
+      return res.status(403).json({ error: "Not authorized to update this product" });
+    }
+
+    // Store original status for comparison
+    const originalStatus = product.status;
+    console.log(`Original product status: ${originalStatus}`);
+    console.log(`Product title: ${product.title}`);
+    console.log(`Product ID: ${product._id}`);
+    product.title = title || product.title;
+    product.description = description || product.description;
+    product.price = price ? Number(price) : product.price;
+    product.quantity = quantity ? Number(quantity) : product.quantity;
+    product.condition = condition || product.condition;
+    product.category = category ? category.toUpperCase() : product.category;
+    product.location = location || product.location;
+    product.material = material || product.material;
+    product.age = {
+      value: ageValue ? Number(ageValue) : product.age.value,
+      unit: ageUnit || product.age.unit,
+    };
+    product.listedAs = listedAs || product.listedAs;
+    product.mode_of_payment = mode_of_payment || product.mode_of_payment;
+    product.courier = courier || product.courier;
+    (product as any).swapWantedCategory = swapWantedCategory ? swapWantedCategory.toUpperCase() : (product as any).swapWantedCategory;
+    (product as any).swapWantedDescription = swapWantedDescription || (product as any).swapWantedDescription;
+
+    // If product was previously approved/listed, revert to for_approval when edited
+    console.log(`Checking if status should change: originalStatus=${originalStatus}, should change=${originalStatus === 'listed' || originalStatus === 'sold'}`);
+    if (originalStatus === 'listed' || originalStatus === 'sold') {
+      product.status = 'for_approval';
+      console.log(`Product ${product.title} status changed from ${originalStatus} to for_approval due to edit`);
+    } else {
+      console.log(`Product ${product.title} status remains ${originalStatus} (no change needed)`);
+    }
+
+    await product.save();
+    console.log(`Product ${product.title} final status after save: ${product.status}`);
+
+    // Send email notification to admin about product edit (if it was previously approved)
+    if ((originalStatus === 'listed' || originalStatus === 'sold') && product.owner) {
+      try {
+        const owner = product.owner as any;
+        const shopName = owner.firstName || 'Seller';
+        // You can add a specific email for admin notifications here
+        console.log(`Product "${product.title}" edited by ${shopName} - requires re-approval`);
+      } catch (emailError) {
+        console.error('Failed to send admin notification:', emailError);
+      }
+    }
+
+    // Emit WebSocket event for real-time updates
+    if ((req as any).io) {
+      const io = (req as any).io;
+      const ownerId = product.owner.toString();
+      
+      // Emit to the specific seller
+      io.to(`seller_${ownerId}`).emit('product_status_update', {
+        productId: product._id,
+        status: product.status,
+        action: 'edited',
+        message: `Your product "${product.title}" has been updated and requires re-approval`
+      });
+
+      // Also emit to admin dashboard
+      io.to('admin_dashboard').emit('product_moderation_update', {
+        productId: product._id,
+        status: product.status,
+        action: 'edited',
+        product: product,
+        message: `Product "${product.title}" edited by seller - requires re-approval`
+      });
+    }
+
+    const requiresReapproval = originalStatus === 'listed' || originalStatus === 'sold';
+    console.log(`Response: requiresReapproval=${requiresReapproval}, originalStatus=${originalStatus}, finalStatus=${product.status}`);
+    
+    res.status(200).json({ 
+      message: "Product updated successfully", 
+      product,
+      requiresReapproval: requiresReapproval
+    });
+  } catch (err) {
+    console.error('Error updating product:', err);
+    res.status(500).json({ error: 'Failed to update product' });
+  }
+};
+
+export const deleteProduct = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    // Check if user owns the product
+    if (product.owner.toString() !== (req as any).user._id.toString()) {
+      return res.status(403).json({ error: "Not authorized to delete this product" });
+    }
+
+    await Product.findByIdAndDelete(id);
+
+    res.status(200).json({ message: "Product deleted successfully" });
+  } catch (err) {
+    console.error('Error deleting product:', err);
+    res.status(500).json({ error: 'Failed to delete product' });
+  }
+};
+
+export const uploadImage = async (req: Request, res: Response) => {
+  try {
+    const image = req.file;
+
+    if (!image) {
+      return res.status(400).json({ error: "Image file is required." });
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(image.mimetype)) {
+      return res.status(400).json({ 
+        error: "Invalid file type. Only JPEG, PNG, and WebP images are allowed." 
+      });
+    }
+
+    // Validate file size (5MB limit)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    if (image.size > maxSize) {
+      return res.status(400).json({ 
+        error: "File too large. Maximum size is 5MB." 
+      });
+    }
+
+    const result = await cloudinary.v2.uploader.upload(image.path, {
+      folder: "ecommerce-products",
+      public_id: `product-image-${new Date().getTime()}`,
+      resource_type: "auto",
+    });
+
+    res.status(200).json({ 
+      message: "Image uploaded successfully", 
+      secure_url: result.secure_url 
+    });
+  } catch (err: any) {
+    console.error('Error uploading image:', err);
+    
+    // Provide more specific error messages
+    if (err.http_code === 400) {
+      return res.status(400).json({ error: "Invalid image file or format." });
+    } else if (err.http_code === 401) {
+      return res.status(500).json({ error: "Cloudinary authentication failed. Please check configuration." });
+    } else if (err.http_code === 403) {
+      return res.status(500).json({ error: "Cloudinary access forbidden. Please check permissions." });
+    } else {
+      return res.status(500).json({ error: `Failed to upload image: ${err.message || 'Unknown error'}` });
+    }
+  }
+};
+
+export const createProduct = async (req: Request, res: Response) => {
+  try {
+    const {
+      title,
+      description,
+      price,
+      quantity,
+      condition,
+      category,
+      location,
+      material,
+      ageValue,
+      ageUnit,
+      listedAs,
+      mode_of_payment,
+      courier,
+      images,
+      swapWantedCategory,
+      swapWantedDescription,
+    } = req.body as any;
+
+    const effectiveStatus = "for_approval";
+    // Note: Since effectiveStatus is always "for_approval", price validation is not needed here
+    // Price validation will be handled during product approval process
+
+    const newProduct: IProduct = new Product({
+      title,
+      description,
+      price: Number(price) || undefined, // Store price if provided, will be validated during approval
+      quantity: Number(quantity) || 1,
+      condition,
+      category: category ? category.toUpperCase() : category,
+      location,
+      images: images || [],
+      owner: (req as any).user._id,
+      status: effectiveStatus,
+      material,
+      age: {
+        value: Number(ageValue) || 0,
+        unit: ageUnit || "months",
+      },
+      listedAs: (listedAs === 'sale' || listedAs === 'swap') ? listedAs : 'sale',
+      mode_of_payment: mode_of_payment || 'cash',
+      courier: courier || 'J&T Express',
+      swapWantedCategory: swapWantedCategory ? swapWantedCategory.toUpperCase() : swapWantedCategory || '',
+      swapWantedDescription: swapWantedDescription || '',
+    } as any);
+
+    await newProduct.save();
+    res.status(201).json({ message: "Product created successfully!", product: newProduct });
+  } catch (err) {
+    console.error('Error creating product:', err);
+    res.status(500).json({ error: "Failed to create product" });
+  }
+};
+
+// Mark product as sold (for testing or admin use)
+export const markProductAsSold = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { buyerName } = req.body;
+
+    const product = await Product.findById(id).populate('owner', 'email firstName lastName');
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    // Update product status to sold
+    product.status = 'sold';
+    await product.save();
+
+    // Send email notification to seller
+    if (product.owner) {
+      try {
+        const owner = product.owner as any;
+        const shopName = owner.firstName || 'Seller';
+        const emailResult = await sendProductSoldEmail(owner.email, product.title, shopName, buyerName || 'A buyer');
+        
+        if (emailResult.success) {
+          console.log(`✅ Sold email sent to ${owner.email} for product: ${product.title}`);
+        } else {
+          console.log(`📧 Email service not configured - sold notification skipped for ${owner.email}`);
+        }
+      } catch (emailError) {
+        console.error('Failed to send sold email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    // Emit WebSocket event for real-time updates
+    if ((req as any).io) {
+      const io = (req as any).io;
+      const ownerId = product.owner.toString();
+      
+      // Emit to the specific seller
+      io.to(`seller_${ownerId}`).emit('product_sold_update', {
+        productId: product._id,
+        productName: product.title,
+        buyerName: buyerName || 'A buyer',
+        message: `Your product "${product.title}" has been sold!`
+      });
+    }
+
+    res.status(200).json({
+      message: "Product marked as sold successfully",
+      product: product
+    });
+  } catch (err) {
+    console.error('Error marking product as sold:', err);
+    res.status(500).json({ error: "Failed to mark product as sold" });
   }
 };

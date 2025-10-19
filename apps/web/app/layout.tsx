@@ -6,6 +6,7 @@ import { CartProvider } from "../contexts/CartContext";
 import { WishlistProvider } from "../contexts/WishlistContext";
 import SessionProvider from "../components/SessionProvider";
 import SiteVisitTracker from "../components/SiteVisitTracker";
+import ActivityTracker from "../components/ActivityTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,6 +49,9 @@ export default function RootLayout({
                 {children}
               </WishlistProvider>
             </CartProvider>
+            <SiteVisitTracker />
+            <ActivityTracker />
+            {children}
           </AuthProvider>
         </SessionProvider>
       </body>

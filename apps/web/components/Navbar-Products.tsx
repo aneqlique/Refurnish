@@ -417,8 +417,8 @@ gsap.set(navbarRef.current, {
 
               {isAuthenticated ? (
                 <div className="relative">
-                  <button
-                    onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                  <Link
+                    href={`/user-profile/${user?.email?.replace('@gmail.com', '').replace('@', '') || ''}`}
                     className="w-10 h-10 rounded-full bg-[#636B2F] flex items-center justify-center hover:bg-[#4d5323] transition-modern cursor-pointer text-white font-semibold overflow-hidden"
                   >
                     {user?.profilePicture ? (
@@ -438,46 +438,7 @@ gsap.set(navbarRef.current, {
                     <span className={`${user?.profilePicture ? 'hidden' : 'flex'} items-center justify-center w-full h-full`}>
                       {user?.firstName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
                     </span>
-                  </button>
-                  
-                  {/* Profile Dropdown */}
-                  {isProfileMenuOpen && (
-                    <div className="profile-menu absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                      <div className="p-3 border-b border-gray-100">
-                        <p className="text-sm font-medium text-gray-900">
-                          {user?.firstName} {user?.lastName}
-                        </p>
-                        <p className="text-xs text-gray-500">{user?.email}</p>
-                      </div>
-                      <div className="py-1">
-                        <Link
-                          href="/user-profile"
-                          className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setIsProfileMenuOpen(false)}
-                        >
-                          Profile
-                        </Link>
-                        {user?.role === 'admin' && (
-                          <Link
-                            href="/admin/dashboard"
-                            className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            onClick={() => setIsProfileMenuOpen(false)}
-                          >
-                            Admin Dashboard
-                          </Link>
-                        )}
-                        <button
-                          onClick={() => {
-                            logout();
-                            setIsProfileMenuOpen(false);
-                          }}
-                          className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Logout
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  </Link>
                 </div>
               ) : (
                 <Link href="/login">
