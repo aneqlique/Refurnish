@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
+import { useCartContext } from "../../contexts/CartContext";
+import { useWishlistContext } from "../../contexts/WishlistContext";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -47,6 +49,8 @@ export default function ChairsCatalogPage() {
 }
 
 function ChairsCatalogContent() {
+  const cart = useCartContext();
+  const wishlist = useWishlistContext();
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{
     top: number;
@@ -327,21 +331,31 @@ function ChairsCatalogContent() {
               {/* Icons */}
               <div className="nav-icons flex items-center space-x-3 sm:space-x-4 text-gray-700">
                 <Link href="/cart-details/wishlist">
-                  <button className="w-8 h-8 sm:w-9 cursor-pointer sm:h-9 flex items-center justify-center hover:text-(--color-olive)">
+                  <button className="w-8 h-8 sm:w-9 cursor-pointer sm:h-9 flex items-center justify-center hover:text-(--color-olive) relative">
                     <img
                       src="/icon/heartIcon.png"
                       alt="Wishlist"
                       className="h-4 w-auto"
                     />
+                    {wishlist.wishlistCount > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                        {wishlist.wishlistCount}
+                      </span>
+                    )}
                   </button>
                 </Link>
                 <Link href="/cart-details/cart">
-                  <button className="w-8 h-8 sm:w-10 cursor-pointer sm:h-10 flex items-center justify-center hover:text-(--color-olive)">
+                  <button className="w-8 h-8 sm:w-10 cursor-pointer sm:h-10 flex items-center justify-center hover:text-(--color-olive) relative">
                     <img
                       src="/icon/cartIcon.png"
                       alt="Cart"
                       className="h-4 w-auto"
                     />
+                    {cart.cartCount > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                        {cart.cartCount}
+                      </span>
+                    )}
                   </button>
                 </Link>
 

@@ -5,14 +5,9 @@ import { useEffect, useState, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Footer from '../../components/Footer';
-import { useWishlist } from '../../hooks/useWishlist';
-import Navbar from '../../components/Navbar-Products';
-import WishlistSidebar from '../../components/WishlistSidebar';
-import CartSidebar from '../../components/CartSidebar';
-import ChatBubble from '../../components/ChatBubble';
+import { useWishlistContext } from '../../contexts/WishlistContext';
 import { useCartContext } from '../../contexts/CartContext';
-import { saleProducts, newProducts, featuredProducts, forSwapProducts } from '../../data/products';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 
 
 if (typeof window !== "undefined") {
@@ -74,20 +69,16 @@ export default function ItemViewSalePage() {
   const navbarRef = useRef<HTMLElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [currentProduct, setCurrentProduct] = useState<Product>(fallbackProduct);
   const [relatedProducts, setRelatedProducts] = useState<Array<{ id: string; title: string; image: string; location: string; price: number }>>([]);
   const [similarProductsData, setSimilarProductsData] = useState<Array<{ id: string; name: string; image: string; price: string; location: string }>>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isLiked, setIsLiked] = useState(false);
-  const [similarProductsIndex, setSimilarProductsIndex] = useState(0);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   
   // Use shared hooks
   const cart = useCartContext();
-  const wishlist = useWishlist();
+  const wishlist = useWishlistContext();
   // Load product and lists
   useEffect(() => {
     const id = searchParams.get('id') || '';
@@ -269,17 +260,6 @@ export default function ItemViewSalePage() {
     );
   };
 
-  const nextSimilarProducts = () => {
-    setSimilarProductsIndex((prev) => 
-      prev + 3 >= similarProductsData.length ? 0 : prev + 3
-    );
-  };
-
-  const prevSimilarProducts = () => {
-    setSimilarProductsIndex((prev) => 
-      prev - 3 < 0 ? Math.max(0, similarProductsData.length - 3) : prev - 3
-    );
-  };
 
   // Check scroll position and update button visibility
   const checkScrollPosition = () => {
@@ -341,12 +321,24 @@ export default function ItemViewSalePage() {
               </div>
 
               <div className="nav-icons flex items-center space-x-3 sm:space-x-4 text-gray-700">
-                <button className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:text-(--color-olive)">
+                <button className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:text-(--color-olive) relative">
                   <img src="/icon/heartIcon.png" alt="Wishlist" className="h-4 w-auto" />
+                  {wishlist.wishlistCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                      {wishlist.wishlistCount}
+                    </span>
+                  )}
                 </button>
-                <button className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center hover:text-(--color-olive)">
-                  <img src="/icon/cartIcon.png" alt="Cart" className="h-4 w-auto" />
-                </button>
+                <Link href="/cart-details/cart">
+                  <button className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center hover:text-(--color-olive) relative">
+                    <img src="/icon/cartIcon.png" alt="Cart" className="h-4 w-auto" />
+                    {cart.cartCount > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                        {cart.cartCount}
+                      </span>
+                    )}
+                  </button>
+                </Link>
                 <button className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:text-(--color-olive)">
                   <img src="/icon/menuIcon.png" alt="Account" className="h-4 w-auto" />
                 </button>
@@ -464,20 +456,34 @@ export default function ItemViewSalePage() {
 
                {/* Action Buttons */}
                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                 <button onClick={() => setIsLiked(!isLiked)} className={`flex-1 py-2.5 sm:py-3 px-4 sm:px-6 rounded-full border-2 font-medium transition-all duration-300 text-sm sm:text-base ${
-                   isLiked ? 'border-red-500 text-red-500 bg-red-50' : 'border-gray-300 text-gray-700 hover:border-(--color-olive) hover:text-(--color-olive)'
-                 }`}>
+                 <button 
+                   onClick={() => {
+                     const wishlistItem = {
+                       id: currentProduct.id.toString(),
+                       name: currentProduct.title,
+                       price: `₱${currentProduct.price.toLocaleString()}`,
+                       priceNum: currentProduct.price,
+                       location: currentProduct.location,
+                       image: currentProduct.image,
+                       category: currentProduct.material
+                     };
+                     wishlist.toggleWishlist(wishlistItem);
+                   }}
+                   className={`flex-1 py-2.5 sm:py-3 px-4 sm:px-6 rounded-full border-2 font-medium transition-all duration-300 text-sm sm:text-base ${
+                     wishlist.isInWishlist(currentProduct.id) ? 'border-red-500 text-red-500 bg-red-50' : 'border-gray-300 text-gray-700 hover:border-(--color-olive) hover:text-(--color-olive)'
+                   }`}
+                 >
                    <div className="flex items-center justify-center gap-2">
-                     <svg className="w-4 h-4 sm:w-5 sm:h-5" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                     <svg className="w-4 h-4 sm:w-5 sm:h-5" fill={wishlist.isInWishlist(currentProduct.id) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                      </svg>
-                     {isLiked ? 'Liked' : 'Like'}
+                     {wishlist.isInWishlist(currentProduct.id) ? 'Liked' : 'Like'}
                    </div>
                  </button>
                  <button 
                    onClick={() => {
                      const cartItem = {
-                       id: Number(currentProduct.id),
+                       id: currentProduct.id.toString(),
                        name: currentProduct.title,
                        price: `₱${currentProduct.price.toLocaleString()}`,
                        priceNum: currentProduct.price,
@@ -561,15 +567,26 @@ export default function ItemViewSalePage() {
                          />
                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                          <button 
-                          onClick={() => wishlist.toggleWishlist(product)}
+                          onClick={() => {
+                            const wishlistItem = {
+                              id: product.id.toString(),
+                              name: product.name,
+                              price: product.price,
+                              priceNum: parseFloat(product.price.replace(/[₱,\s]/g, '')),
+                              location: product.location,
+                              image: product.image,
+                              category: 'Similar Product'
+                            };
+                            wishlist.toggleWishlist(wishlistItem);
+                          }}
                            className={`absolute cursor-pointer top-2 sm:top-3 right-2 sm:right-3 p-1.5 sm:p-2 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-white transform hover:scale-110 ${
-                            wishlist.isInWishlist(product.id as unknown as number) ? 'bg-red-100' : 'bg-white/80'
+                            wishlist.isInWishlist(product.id) ? 'bg-red-100' : 'bg-white/80'
                            }`}
                          >
                            <img 
                              src="/icon/heartIcon.png" 
                              alt="wishlist" 
-                            className={`w-3 h-3 sm:w-4 sm:h-4 ${wishlist.isInWishlist(product.id as unknown as number) ? 'filter brightness-0 saturate-100 invert-[0.2] sepia-[1] saturate-[5] hue-rotate-[340deg]' : ''}`}
+                            className={`w-3 h-3 sm:w-4 sm:h-4 ${wishlist.isInWishlist(product.id) ? 'filter brightness-0 saturate-100 invert-[0.2] sepia-[1] saturate-[5] hue-rotate-[340deg]' : ''}`}
                            />
                          </button>
                        </div>
@@ -584,7 +601,7 @@ export default function ItemViewSalePage() {
                            <button 
                             onClick={() => {
                               const cartItem = {
-                                id: Number(product.id),
+                                id: product.id.toString(),
                                 name: product.name,
                                 price: product.price,
                                 priceNum: parseFloat(product.price.replace(/[₱,\s]/g, '')),

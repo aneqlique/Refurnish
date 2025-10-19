@@ -203,7 +203,7 @@ export default function Home() {
               onSearchSubmit={handleSearchSubmit}
               onAuthClick={() => setIsAuthModalOpen(true)}
               cartItemsCount={cart.cartItems.length}
-              wishlistItemsCount={wishlist.wishlistItems.length}
+              wishlistItemsCount={wishlist.wishlistCount}
               onCartClick={() => cart.setIsCartOpen(true)}
               onWishlistClick={() => wishlist.setIsWishlistOpen(true)}
             />
@@ -450,6 +450,7 @@ export default function Home() {
         onUpdateQuantity={cart.updateQuantity}
         onRemoveItem={cart.removeFromCart}
         totalPrice={cart.getTotalPrice()}
+        isBackendAvailable={cart.isBackendAvailable}
       />
 
       {/* Wishlist Sidebar */}

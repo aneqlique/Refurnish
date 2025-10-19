@@ -1,11 +1,13 @@
 "use client";
 import { useState } from 'react';
 import Navbar from '../../components/Navbar-Products';
+import { useCartContext } from '../../contexts/CartContext';
+import { useWishlistContext } from '../../contexts/WishlistContext';
 
 export default function AboutUs() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [cartItemsCount, setCartItemsCount] = useState(0);
-  const [wishlistItemsCount, setWishlistItemsCount] = useState(0);
+  const cart = useCartContext();
+  const wishlist = useWishlistContext();
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
@@ -57,8 +59,8 @@ export default function AboutUs() {
           onSearchChange={handleSearchChange}
           onSearchSubmit={handleSearchSubmit}
           onAuthClick={handleAuthClick}
-          cartItemsCount={cartItemsCount}
-          wishlistItemsCount={wishlistItemsCount}
+          cartItemsCount={cart.cartCount}
+          wishlistItemsCount={wishlist.wishlistCount}
           onCartClick={handleCartClick}
           onWishlistClick={handleWishlistClick}
         />

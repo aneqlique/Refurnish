@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../contexts/AuthContext";
 import { CartProvider } from "../contexts/CartContext";
+import { WishlistProvider } from "../contexts/WishlistContext";
 import SessionProvider from "../components/SessionProvider";
 import SiteVisitTracker from "../components/SiteVisitTracker";
 
@@ -42,8 +43,10 @@ export default function RootLayout({
         <SessionProvider>
           <AuthProvider>
             <CartProvider>
-              <SiteVisitTracker />
-              {children}
+              <WishlistProvider>
+                <SiteVisitTracker />
+                {children}
+              </WishlistProvider>
             </CartProvider>
           </AuthProvider>
         </SessionProvider>

@@ -5,6 +5,8 @@ import { useEffect, useState, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useCartContext } from '../../contexts/CartContext';
+import { useWishlistContext } from '../../contexts/WishlistContext';
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -71,6 +73,8 @@ const fallbackSwapProduct: SwapProduct = {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://refurnish-backend.onrender.com';
 
 export default function ItemViewSwapPage() {
+  const cart = useCartContext();
+  const wishlist = useWishlistContext();
   const navbarRef = useRef<HTMLElement>(null);
   const searchParams = useSearchParams();
   const [currentSwapProduct, setCurrentSwapProduct] = useState<SwapProduct>(fallbackSwapProduct);
@@ -198,11 +202,21 @@ export default function ItemViewSwapPage() {
               </div>
 
               <div className="nav-icons flex items-center space-x-3 sm:space-x-4 text-gray-700">
-                <button className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:text-(--color-olive)">
+                <button className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:text-(--color-olive) relative">
                   <img src="/icon/heartIcon.png" alt="Wishlist" className="h-4 w-auto" />
+                  {wishlist.wishlistCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                      {wishlist.wishlistCount}
+                    </span>
+                  )}
                 </button>
-                <button className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center hover:text-(--color-olive)">
+                <button className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center hover:text-(--color-olive) relative">
                   <img src="/icon/cartIcon.png" alt="Cart" className="h-4 w-auto" />
+                  {cart.cartCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                      {cart.cartCount}
+                    </span>
+                  )}
                 </button>
                 <button className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:text-(--color-olive)">
                   <img src="/icon/menuIcon.png" alt="Account" className="h-4 w-auto" />

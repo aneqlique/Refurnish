@@ -25,6 +25,7 @@ const currency = new Intl.NumberFormat("en-PH", {
 export default function CartPage() {
   const cart = useCartContext();
   const [selectedItems, setSelectedItems] = useState<Set<string | number>>(new Set());
+  const [loadingItems, setLoadingItems] = useState<Set<string | number>>(new Set());
   
 
   // Convert cart hook items to local cart items with selection state
@@ -61,27 +62,69 @@ export default function CartPage() {
     });
   }
 
-  function incrementQuantity(itemId: string | number) {
+  async function incrementQuantity(itemId: string | number) {
     const item = cart.cartItems.find(item => item.id === itemId);
-    if (item) {
-      cart.updateQuantity(Number(itemId), item.quantity + 1);
+    if (item && !loadingItems.has(itemId)) {
+      setLoadingItems(prev => new Set(prev).add(itemId));
+      try {
+        // Prevent incrementing beyond a reasonable limit
+        const maxQuantity = 99;
+        const newQuantity = Math.min(item.quantity + 1, maxQuantity);
+        await cart.updateQuantity(itemId, newQuantity);
+      } catch (error) {
+        console.error('Error incrementing quantity:', error);
+        // You could add a toast notification here
+      } finally {
+        setLoadingItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(itemId);
+          return newSet;
+        });
+      }
     }
   }
 
-  function decrementQuantity(itemId: string | number) {
+  async function decrementQuantity(itemId: string | number) {
     const item = cart.cartItems.find(item => item.id === itemId);
-    if (item) {
-      cart.updateQuantity(Number(itemId), Math.max(1, item.quantity - 1));
+    if (item && !loadingItems.has(itemId)) {
+      setLoadingItems(prev => new Set(prev).add(itemId));
+      try {
+        const newQuantity = item.quantity - 1;
+        if (newQuantity <= 0) {
+          // If quantity becomes 0 or negative, remove the item
+          await cart.removeFromCart(itemId);
+          setSelectedItems((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(itemId);
+            return newSet;
+          });
+        } else {
+          await cart.updateQuantity(itemId, newQuantity);
+        }
+      } catch (error) {
+        console.error('Error decrementing quantity:', error);
+        // You could add a toast notification here
+      } finally {
+        setLoadingItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(itemId);
+          return newSet;
+        });
+      }
     }
   }
 
-  function removeItem(itemId: string | number) {
-    cart.removeFromCart(Number(itemId));
-    setSelectedItems((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(itemId);
-      return newSet;
-    });
+  async function removeItem(itemId: string | number) {
+    try {
+      await cart.removeFromCart(itemId);
+      setSelectedItems((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
+    } catch (error) {
+      console.error('Error removing item:', error);
+    }
   }
 
   const someSelected = cartItems.some((item) => item.selected);
@@ -93,6 +136,16 @@ export default function CartPage() {
 
       <main className="mx-auto w-full max-w-6xl px-4 sm:px-6 md:px-8 flex-1">
         <CartTabs />
+        
+        {/* Back to Products Navigation */}
+        <Link href="/product-catalog-sale" className="inline-flex items-center gap-2 mb-4 sm:mb-6 text-(--color-primary) hover:text-(--color-olive) transition-colors">
+          <div className="w-6 h-6 sm:w-7 sm:h-7 bg-(--color-primary) rounded-full flex items-center justify-center">
+            <svg className="w-3 h-3 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </div>
+          <span className="text-xs sm:text-sm font-medium">Back to Products</span>
+        </Link>
 
 
         <div className="mt-6 font-sans rounded-2xl bg-white shadow-sm ring-1 ring-black/[0.06]">
@@ -161,17 +214,25 @@ export default function CartPage() {
                   <IconButton
                     label="Decrease quantity"
                     onClick={() => decrementQuantity(item.id)}
-                    className="text-[#273815] hover:bg-[#273815]/10"
+                    className={`text-[#273815] hover:bg-[#273815]/10 disabled:opacity-50 disabled:cursor-not-allowed ${loadingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <MinusIcon />
+                    {loadingItems.has(item.id) ? (
+                      <div className="w-4 h-4 border-2 border-[#273815] border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <MinusIcon />
+                    )}
                   </IconButton>
                   <span className="w-6 text-center font-sans select-none font-medium">{item.quantity}</span>
                   <IconButton
                     label="Increase quantity"
                     onClick={() => incrementQuantity(item.id)}
-                    className="text-[#273815] font-sans hover:bg-[#273815]/10"
+                    className={`text-[#273815] font-sans hover:bg-[#273815]/10 ${loadingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <PlusIcon />  
+                    {loadingItems.has(item.id) ? (
+                      <div className="w-4 h-4 border-2 border-[#273815] border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <PlusIcon />
+                    )}
                   </IconButton>
                 </div>
 
@@ -256,6 +317,8 @@ export default function CartPage() {
 }
 
 function SiteHeader() {
+  const cart = useCartContext();
+  
   return (
     <header className="w-full font-sans">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 md:px-8 h-16 flex items-center gap-4">
@@ -276,7 +339,15 @@ function SiteHeader() {
           </div>
         </div>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
+          <button className="size-9 rounded-full hover:bg-neutral-100 flex items-center justify-center relative">
+            <img src="/icon/cartIcon.png" alt="Cart" className="h-4 w-auto" />
+            {cart.cartCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                {cart.cartCount}
+              </span>
+            )}
+          </button>
           <button aria-label="Menu" className="size-9 rounded-full hover:bg-neutral-100 flex items-center justify-center">
             <MenuIcon />
           </button>

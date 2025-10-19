@@ -7,10 +7,13 @@ interface CartContextType {
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
   addToCart: (product: any) => void;
-  removeFromCart: (productId: number) => void;
-  updateQuantity: (productId: number, quantity: number) => void;
+  removeFromCart: (productId: string | number) => void;
+  updateQuantity: (productId: string | number, quantity: number) => void;
   getTotalPrice: () => number;
   clearCart: () => void;
+  cartCount: number;
+  getCartCount: () => void;
+  isBackendAvailable: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);

@@ -7,6 +7,8 @@ import { Server as SocketIOServer } from "socket.io";
 import userRoutes from "./modules/users/routes/user.route";
 import productRoutes from "./modules/products/routes/products.route";
 import siteVisitRoutes from "./modules/site-visits/routes/site-visits.route";
+import cartRoutes from "./modules/carts/routes/cart.routes";
+import wishlistRoutes from "./modules/wishlists/routes/wishlist.routes";
 
 const app = express();
 
@@ -35,6 +37,8 @@ app.get("/", (req, res) => {
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/site-visits", siteVisitRoutes);
+app.use("/api/carts", cartRoutes);
+app.use("/api/wishlists", wishlistRoutes);
 
 //Socket.io setup
 const httpServer = http.createServer(app);
