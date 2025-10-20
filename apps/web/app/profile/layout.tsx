@@ -36,6 +36,7 @@ export default function ProfileLayout({ children }: { children: ReactNode }) {
         <UserProfileSidebar
           isMobileMenuOpen={isMobileMenuOpen}
           setIsMobileMenuOpen={setIsMobileMenuOpen}
+          onLogoutClick={handleLogoutClick}
         />
 
         {/* Custom Profile Navbar - Fixed at top */}

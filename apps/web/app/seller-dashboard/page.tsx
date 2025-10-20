@@ -486,6 +486,52 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                     return;
                 }
 
+                // Handle image uploads for editing
+                let uploadedImages: string[] = [];
+                
+                // If new images were uploaded, upload them
+                if (images.length > 0) {
+                    console.log('Uploading new images for product update:', images.length);
+                    
+                    // Validate images before upload
+                    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                    const maxSize = 5 * 1024 * 1024; // 5MB
+                    
+                    for (const imageFile of images) {
+                        if (imageFile) {
+                            if (!allowedTypes.includes(imageFile.type)) {
+                                throw new Error(`Invalid file type: ${imageFile.name}. Only JPEG, PNG, and WebP images are allowed.`);
+                            }
+                            if (imageFile.size > maxSize) {
+                                throw new Error(`File too large: ${imageFile.name}. Maximum size is 5MB.`);
+                            }
+                            
+                            // Upload image
+                            const imageFormData = new FormData();
+                            imageFormData.append('image', imageFile);
+                            
+                            try {
+                                const uploadRes = await fetch(`${API_BASE_URL}/api/products/upload-image`, {
+                                    method: 'POST',
+                                    headers: { Authorization: `Bearer ${token}` },
+                                    body: imageFormData,
+                                });
+                                
+                                if (uploadRes.ok) {
+                                    const uploadData = await uploadRes.json();
+                                    uploadedImages.push(uploadData.secure_url);
+                                    console.log('Image uploaded successfully:', uploadData.secure_url);
+                                } else {
+                                    throw new Error(`Failed to upload image: ${imageFile.name}`);
+                                }
+                            } catch (uploadError) {
+                                console.error('Error uploading image:', uploadError);
+                                throw new Error(`Failed to upload image: ${imageFile.name}`);
+                            }
+                        }
+                    }
+                }
+
                 // Update existing product
                 const updateData = {
                     title: addProductForm.productName,
@@ -520,6 +566,8 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                     status: 'for_approval', // Revert to for_approval when editing
                     swapWantedCategory: addProductForm.swapWantedCategory || '',
                     swapWantedDescription: addProductForm.swapWantedDescription || '',
+                    // Include new images if any were uploaded
+                    ...(uploadedImages.length > 0 && { images: uploadedImages }),
                 };
 
                 const res = await fetch(`${API_BASE_URL}/api/products/${editingProduct._id || editingProduct.id}`, {
@@ -545,6 +593,8 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                         ? { 
                             ...p, 
                             ...updateData, 
+                            // Update images if new ones were uploaded
+                            ...(uploadedImages.length > 0 && { images: uploadedImages }),
                             status: data.product?.status || 'for_approval',
                             updatedAt: new Date().toISOString()
                           }
@@ -1126,7 +1176,7 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
             material: product.material || '',
             age: product.age ? `${product.age.value} ${product.age.unit}` : '',
             description: product.description || '',
-            images: [null, null, null, null] as (File | null)[], // Will be handled by image previews
+            images: [null, null, null, null] as (File | null)[], // New images will be handled separately
             modeOfTransaction: product.listedAs === 'swap' ? 'For Swap' : product.listedAs === 'both' ? 'Both' : 'For Sale',
             price: product.price ? product.price.toString() : '',
             quantity: product.quantity || 1,
@@ -1137,8 +1187,8 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
             swapWantedDescription: product.swapWantedDescription || '',
         });
         
-        // Don't automatically select first image in edit mode
-        // Images will be shown in the modal's image preview grid
+        // Reset image preview when starting to edit
+        setSelectedImagePreview(null);
         
         setIsAddProductModalOpen(true);
     };

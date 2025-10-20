@@ -24,6 +24,8 @@ export interface IUser extends Document {
   followingCount?: number;
   followersPublic?: boolean;
   followingPublic?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
   generateAuthToken(): string;
 }
 

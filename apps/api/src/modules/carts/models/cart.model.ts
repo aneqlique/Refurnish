@@ -50,14 +50,15 @@ const CartSchema = new Schema<ICart>({
   userId: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    sparse: true // Allow multiple null values
   },
   items: [CartItemSchema]
 }, {
   timestamps: true
 });
 
-// Index for efficient queries
-CartSchema.index({ userId: 1 });
+// Index for efficient queries - remove any conflicting indexes
+CartSchema.index({ userId: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model<ICart>('Cart', CartSchema);

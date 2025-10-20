@@ -17,10 +17,21 @@ export const getCart = async (req: Request, res: Response) => {
       try {
         cart = new Cart({ userId, items: [] });
         await cart.save();
-      } catch (saveError) {
+      } catch (saveError: any) {
         console.error('Error creating empty cart:', saveError);
-        // Return empty cart structure even if save fails
-        return res.json({ userId, items: [], createdAt: new Date(), updatedAt: new Date() });
+        
+        // Handle duplicate key error specifically
+        if (saveError.code === 11000) {
+          // Try to find the cart again in case it was created by another request
+          cart = await Cart.findOne({ userId });
+          if (!cart) {
+            // Return empty cart structure if still not found
+            return res.json({ userId, items: [], createdAt: new Date(), updatedAt: new Date() });
+          }
+        } else {
+          // Return empty cart structure for other errors
+          return res.json({ userId, items: [], createdAt: new Date(), updatedAt: new Date() });
+        }
       }
     }
 
@@ -59,7 +70,19 @@ export const addToCart = async (req: Request, res: Response) => {
     let cart = await Cart.findOne({ userId });
     
     if (!cart) {
-      cart = new Cart({ userId, items: [] });
+      try {
+        cart = new Cart({ userId, items: [] });
+      } catch (error: any) {
+        // Handle duplicate key error - try to find existing cart
+        if (error.code === 11000) {
+          cart = await Cart.findOne({ userId });
+          if (!cart) {
+            return res.status(500).json({ error: 'Unable to create or find cart' });
+          }
+        } else {
+          throw error;
+        }
+      }
     }
 
     // Check if item already exists in cart

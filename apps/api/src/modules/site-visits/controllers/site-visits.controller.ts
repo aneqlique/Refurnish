@@ -14,6 +14,27 @@ export const trackVisit = async (req: Request, res: Response) => {
     const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
     const userAgent = bodyUserAgent || req.get('User-Agent') || 'unknown';
     const userId = req.user?._id;
+    const visitTime = timestamp ? new Date(timestamp) : new Date();
+
+    // Check for recent visits from the same IP/user to prevent spam
+    const recentVisitThreshold = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const recentVisitTime = new Date(visitTime.getTime() - recentVisitThreshold);
+
+    const recentVisit = await SiteVisit.findOne({
+      $and: [
+        { ipAddress },
+        { timestamp: { $gte: recentVisitTime } },
+        { page }
+      ]
+    });
+
+    // If there's a recent visit from the same IP to the same page, don't track
+    if (recentVisit) {
+      return res.status(200).json({ 
+        message: "Visit not tracked - recent visit exists",
+        duplicate: true 
+      });
+    }
 
     const visit = new SiteVisit({  
       ipAddress,
@@ -21,7 +42,7 @@ export const trackVisit = async (req: Request, res: Response) => {
       page,
       referrer,
       userId,
-      timestamp: timestamp ? new Date(timestamp) : new Date()
+      timestamp: visitTime
     });
 
     await visit.save();
