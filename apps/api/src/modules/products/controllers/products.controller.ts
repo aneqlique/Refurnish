@@ -3,15 +3,53 @@ import cloudinary from "cloudinary";
 import Product, { IProduct } from "../models/products.model";
 import SiteVisit from "../../site-visits/models/site-visits.model";
 import User from "../../users/models/user.model";
+import SellerProfile from "../../users/models/seller-profile.model";
 import { sendProductApprovalEmail, sendProductSoldEmail } from "../../../utils/emailService";
 
 declare global {
   namespace Express {
     interface Request {
       file?: Express.Multer.File;
+      io?: any;
     }
   }
 }
+
+// Helper function to emit admin notification updates
+const emitAdminNotificationUpdate = async (io: any) => {
+  try {
+    // Get new seller requests (users with role 'seller' but no approved seller profile)
+    const newSellerRequests = await User.countDocuments({
+      role: 'seller',
+      $or: [
+        { 'sellerProfile': { $exists: false } },
+        { 'sellerProfile.approved': { $ne: true } }
+      ]
+    });
+
+    // Get pending products (products awaiting approval)
+    const pendingProducts = await Product.countDocuments({
+      status: 'for_approval'
+    });
+
+    // Get pending shop approvals (seller profiles with pending changes)
+    const pendingShopApprovals = await SellerProfile.countDocuments({
+      'pendingChanges': { $exists: true, $ne: null }
+    });
+
+    const totalNotifications = newSellerRequests + pendingProducts + pendingShopApprovals;
+
+    // Emit to admin dashboard
+    io.to('admin_dashboard').emit('admin_notification_update', {
+      newSellerRequests,
+      pendingProducts,
+      pendingShopApprovals,
+      totalNotifications
+    });
+  } catch (error) {
+    console.error('Error emitting admin notification update:', error);
+  }
+};
 
 export const uploadProduct = async (req: Request, res: Response) => {
   try {
@@ -279,6 +317,9 @@ export const moderateProduct = async (req: Request, res: Response) => {
         action: action,
         product: updatedProduct
       });
+
+      // Emit notification update to admin dashboard
+      emitAdminNotificationUpdate(io);
     }
 
     res.status(200).json({
@@ -410,6 +451,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       courier,
       swapWantedCategory,
       swapWantedDescription,
+      images,
     } = req.body as any;
 
     const product = await Product.findById(id).populate('owner', 'email firstName lastName');
@@ -451,6 +493,12 @@ export const updateProduct = async (req: Request, res: Response) => {
     product.courier = courier || product.courier;
     (product as any).swapWantedCategory = swapWantedCategory ? swapWantedCategory.toUpperCase() : (product as any).swapWantedCategory;
     (product as any).swapWantedDescription = swapWantedDescription || (product as any).swapWantedDescription;
+    
+    // Update images if provided
+    if (images && Array.isArray(images) && images.length > 0) {
+      console.log(`Updating product images: ${images.length} new images`);
+      product.images = images;
+    }
 
     // If product was previously approved/listed, revert to for_approval when edited
     console.log(`Checking if status should change: originalStatus=${originalStatus}, should change=${originalStatus === 'listed' || originalStatus === 'sold'}`);
@@ -635,6 +683,12 @@ export const createProduct = async (req: Request, res: Response) => {
     } as any);
 
     await newProduct.save();
+    
+    // Emit notification update to admin dashboard
+    if ((req as any).io) {
+      await emitAdminNotificationUpdate((req as any).io);
+    }
+    
     res.status(201).json({ message: "Product created successfully!", product: newProduct });
   } catch (err) {
     console.error('Error creating product:', err);

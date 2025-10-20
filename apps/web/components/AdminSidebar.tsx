@@ -3,11 +3,12 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { LogOut, LayoutDashboard, PackageCheck, Users, ChevronDown, ChevronRight } from 'lucide-react';
+import { LogOut, LayoutDashboard, PackageCheck, Users, ChevronDown, ChevronRight, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationBell from './NotificationBell';
 
 interface AdminSidebarProps {
-  activePage: 'dashboard' | 'user-management' | 'seller-management' | 'product-moderation';
+  activePage: 'dashboard' | 'user-management' | 'seller-management' | 'product-moderation' | 'content-management';
 }
 
 const AdminSidebar: React.FC<AdminSidebarProps> = ({ activePage }) => {
@@ -53,18 +54,30 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activePage }) => {
       icon: <PackageCheck className="w-5 h-5 text-gray-500" />,
       hasSubItems: false
     },
+    { 
+      label: 'Content Management', 
+      href: '/admin/content-management', 
+      active: activePage === 'content-management', 
+      icon: <Settings className="w-5 h-5 text-gray-500" />,
+      hasSubItems: false
+    },
   ];
 
   return (
     <div className="fixed top-0 left-0 h-screen w-80 bg-white shadow-sm">
       <div className="w-80 bg-white shadow-sm h-screen flex flex-col">
         <div className="p-6 border-b flex-grow">
-          {/* Header */}
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center">
-              <Image src="/Rf-logo.svg" alt="Rf" width={40} height={40} />
+          {/* Header with Notification Bell */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center">
+                <Image src="/Rf-logo.svg" alt="Rf" width={40} height={40} />
+              </div>
+              <span className="text-lg font-medium text-gray-700">Admin Access</span>
             </div>
-            <span className="text-lg font-medium text-gray-700">Admin Access</span>
+            
+            {/* Notification Bell - Top Right */}
+            <NotificationBell />
           </div>
 
           {/* Admin Profile */}

@@ -5,15 +5,40 @@ import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useWishlist } from '../../hooks/useWishlist';
+import { useContent } from '../../hooks/useContent';
 import Navbar from '../../components/Navbar-Products';
 import WishlistSidebar from '../../components/WishlistSidebar';
 import Footer from '../../components/Footer';
 import AuthModal from '../../components/AuthModal';
 import CartSidebar from '../../components/CartSidebar';
 import ChatBubble from '../../components/ChatBubble';
+import AnnouncementModal from '../../components/AnnouncementModal';
 import { useCart } from '../../hooks/useCart';
-import { saleProducts, newProducts, featuredProducts, forSwapProducts } from '../../data/products';
+// Remove static product imports - we'll fetch from API instead
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+type BackendProduct = {
+  _id: string;
+  title: string;
+  images: string[];
+  location: string;
+  price?: number;
+  category: string;
+  status: string;
+  listedAs: string;
+  createdAt?: string;
+};
+
+type DisplayProduct = {
+  id: string;
+  name: string;
+  image: string;
+  location: string;
+  price: string;
+  category: string;
+  listedAs: string;
+};
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -24,13 +49,19 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   
+  // Product state
+  const [featuredProducts, setFeaturedProducts] = useState<DisplayProduct[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
   // Use shared hooks
   const cart = useCart();
   const wishlist = useWishlist();
+  const { carouselSlides, announcements, isLoading } = useContent();
   
-  const heroSlides = [
+  // Fallback hero slides if no carousel slides from API
+  const fallbackHeroSlides = [
     {
       image: '/bg-heropage.png',
       isRefurnishSlide: true
@@ -44,6 +75,61 @@ export default function Home() {
       scrollTo: 'on-sale'
     }
   ];
+
+  // Use API carousel slides if available, otherwise use fallback
+  const heroSlides = carouselSlides.length > 0 
+    ? carouselSlides.map(slide => ({
+        image: slide.image,
+        title: slide.title,
+        description: slide.description,
+        link: slide.link,
+        isRefurnishSlide: slide.title.toLowerCase().includes('refurnish'),
+        scrollTo: slide.link ? undefined : (slide.title.toLowerCase().includes('sale') ? 'on-sale' : 
+                slide.title.toLowerCase().includes('swap') ? 'for-swap' : undefined)
+      }))
+    : fallbackHeroSlides;
+
+  // Show announcement modal if there are announcements
+  useEffect(() => {
+    if (announcements.length > 0 && !isLoading) {
+      setShowAnnouncementModal(true);
+    }
+  }, [announcements, isLoading]);
+
+  // Fetch featured products from API
+  useEffect(() => {
+    const fetchFeaturedProducts = async () => {
+      try {
+        setIsLoadingProducts(true);
+        
+        // Fetch products with status="listed" (both sale and swap)
+        const res = await fetch(`${API_BASE_URL}/api/products?status=listed`);
+        const data: BackendProduct[] = await res.json();
+        
+        if (!res.ok) throw new Error('Failed to load products');
+
+        // Transform and limit to 8 featured products
+        const transformed: DisplayProduct[] = data.slice(0, 8).map((p) => ({
+          id: p._id,
+          name: p.title,
+          image: Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : '/products/chair/view1.jpg',
+          location: p.location || 'Metro Manila',
+          price: p.price ? `₱${p.price.toLocaleString()}` : 'Price on request',
+          category: (p.category || 'UNCATEGORIZED').toUpperCase(),
+          listedAs: p.listedAs || 'sale',
+        }));
+
+        setFeaturedProducts(transformed);
+      } catch (error) {
+        console.error('Error fetching featured products:', error);
+        setFeaturedProducts([]);
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    };
+
+    fetchFeaturedProducts();
+  }, []);
 
  // Navbar animation 
   useEffect(() => {
@@ -289,52 +375,75 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:my-8 md:mx-20 gap-6">
-            {featuredProducts.map((product, index) => (
-              <div 
-                key={product.id} 
-                className="bg-white rounded-3xl shadow-lg hover:shadow-xl transition-all duration-500 overflow-hidden group transform hover:-translate-y-2"
-                style={{
-                  animationDelay: `${index * 0.1}s`
-                }}
-              >
-                <div className="relative overflow-hidden">
-                  <img 
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-55 object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <button 
-                    onClick={() => wishlist.toggleWishlist(product)}
-                    className={`absolute cursor-pointer top-3 right-3 p-2 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-white transform hover:scale-110 ${
-                      wishlist.isInWishlist(product.id) ? 'bg-red-100' : 'bg-white/80'
-                    }`}
-                  >
-                    <img 
-                      src="/icon/heartIcon.png" 
-                      alt="wishlist" 
-                      className={`w-4 h-4 ${wishlist.isInWishlist(product.id) ? 'filter brightness-0 saturate-100 invert-[0.2] sepia-[1] saturate-[5] hue-rotate-[340deg]' : ''}`}
-                    />
-                  </button>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-(--color-olive) text-md mb-2 line-clamp-2">{product.name}</h3>
-                  <p className="text-(--color-primary) font-bold text-base mb-2">{product.price}</p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center text-gray-600 text-xs">
-                      <img src="/icon/locateIcon.png" alt="location" className="w-3 h-4 mr-2" />
-                      {product.location}
-                    </div>
-                    <button 
-                      onClick={() => cart.addToCart(product)}
-                      className="p-2 cursor-pointer rounded-full hover:bg-gray-100 transition-colors duration-200 transform hover:scale-110"
-                    >
-                      <img src="/icon/addtocart.png" alt="add to cart" className="w-auto h-7" />
-                    </button>
-                  </div>
-                </div>
+            {isLoadingProducts ? (
+              <div className="col-span-full text-center py-20 text-gray-500">
+                Loading products...
               </div>
-            ))}
+            ) : featuredProducts.length === 0 ? (
+              <div className="col-span-full text-center py-20 text-gray-500">
+                No products available yet.
+              </div>
+            ) : (
+              featuredProducts.map((product, index) => (
+                <Link
+                  key={product.id}
+                  href={product.listedAs === 'swap' ? `/item-view-swap?id=${encodeURIComponent(product.id)}` : `/item-view-sale?id=${encodeURIComponent(product.id)}`}
+                  className="block"
+                >
+                  <div 
+                    className="bg-white rounded-3xl shadow-lg hover:shadow-xl transition-all duration-500 overflow-hidden group transform hover:-translate-y-2 cursor-pointer"
+                    style={{
+                      animationDelay: `${index * 0.1}s`
+                    }}
+                  >
+                    <div className="relative overflow-hidden">
+                      <img 
+                        src={product.image}
+                        alt={product.name}
+                        className="w-full h-55 object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          wishlist.toggleWishlist(product);
+                        }}
+                        className={`absolute cursor-pointer top-3 right-3 p-2 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-white transform hover:scale-110 ${
+                          wishlist.isInWishlist(product.id) ? 'bg-red-100' : 'bg-white/80'
+                        }`}
+                      >
+                        <img 
+                          src="/icon/heartIcon.png" 
+                          alt="wishlist" 
+                          className={`w-4 h-4 ${wishlist.isInWishlist(product.id) ? 'filter brightness-0 saturate-100 invert-[0.2] sepia-[1] saturate-[5] hue-rotate-[340deg]' : ''}`}
+                        />
+                      </button>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-(--color-olive) text-md mb-2 line-clamp-2">{product.name}</h3>
+                      <p className="text-(--color-primary) font-bold text-base mb-2">{product.price}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center text-gray-600 text-xs">
+                          <img src="/icon/locateIcon.png" alt="location" className="w-3 h-4 mr-2" />
+                          {product.location}
+                        </div>
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            cart.addToCart(product);
+                          }}
+                          className="p-2 cursor-pointer rounded-full hover:bg-gray-100 transition-colors duration-200 transform hover:scale-110"
+                        >
+                          <img src="/icon/addtocart.png" alt="add to cart" className="w-auto h-7" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
           </div>
           
 
@@ -467,6 +576,14 @@ export default function Home() {
               isOpen={isAuthModalOpen}
               onClose={() => setIsAuthModalOpen(false)}
             />
+
+      {/* Announcement Modal */}
+      {showAnnouncementModal && (
+        <AnnouncementModal
+          announcements={announcements}
+          onClose={() => setShowAnnouncementModal(false)}
+        />
+      )}
       
       {/* Chat Bubble */}
       <ChatBubble />

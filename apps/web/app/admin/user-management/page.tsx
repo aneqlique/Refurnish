@@ -259,8 +259,8 @@ const UserManagementPage: React.FC = () => {
     <ProtectedRoute requireAdmin={true}>
       <div className={`${montserrat.className} flex min-h-screen bg-gray-50`}>
         <AdminSidebar activePage="user-management" />
-      {/* Main Content */}
-      <div className="flex-1 ml-80 p-8 overflow-y-auto">
+        {/* Main Content */}
+        <div className="flex-1 ml-80 p-8 overflow-y-auto">
         {/* Header */}
         <div className="flex items-center mb-6">
           <Menu className="w-5 h-5 text-gray-600 mr-3" /> 
@@ -410,9 +410,9 @@ const UserManagementPage: React.FC = () => {
             </button>
           </div>
         </div>
+        </div>
       </div>
-    </div>
-    {/* Update Modal */}
+      {/* Update Modal */}
     {showUpdateModal && selectedUser && (
       <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/30">
         <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-5">

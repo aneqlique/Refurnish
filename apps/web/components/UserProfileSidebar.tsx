@@ -8,11 +8,12 @@ import { useAuth } from '../contexts/AuthContext';
 interface UserProfileSidebarProps {
   isMobileMenuOpen?: boolean;
   setIsMobileMenuOpen?: (open: boolean) => void;
+  onLogoutClick?: () => void;
 }
 
-const UserProfileSidebar = ({ isMobileMenuOpen = false, setIsMobileMenuOpen }: UserProfileSidebarProps) => {
+const UserProfileSidebar = ({ isMobileMenuOpen = false, setIsMobileMenuOpen, onLogoutClick }: UserProfileSidebarProps) => {
   const pathname = usePathname();
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
 
   const sidebarItems = [
     { 
@@ -45,7 +46,7 @@ const UserProfileSidebar = ({ isMobileMenuOpen = false, setIsMobileMenuOpen }: U
       icon: LogOut, 
       href: '#',
       onClick: () => {
-        logout();
+        onLogoutClick?.();
       }
     }
   ];

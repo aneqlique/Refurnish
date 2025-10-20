@@ -21,6 +21,10 @@ import {
   getFollowers,
   getFollowing,
   updatePrivacySettings,
+  sendOTP,
+  verifyOTP,
+  checkLastLogin,
+  getCurrentOTP,
 } from "../controllers/user.controller";
 import authMiddleware from "../../../middleware/auth";
 import adminAuth from "../../../middleware/adminAuth";
@@ -59,6 +63,12 @@ userRoutes.get("/follow-status/:userId", authMiddleware, checkFollowStatus);
 userRoutes.get("/followers/:userId", authMiddleware, getFollowers);
 userRoutes.get("/following/:userId", authMiddleware, getFollowing);
 userRoutes.put("/privacy-settings", authMiddleware, updatePrivacySettings);
+
+// OTP routes
+userRoutes.post("/send-otp", sendOTP);
+userRoutes.post("/verify-otp", verifyOTP);
+userRoutes.get("/check-last-login/:email", checkLastLogin);
+userRoutes.get("/current-otp/:email", getCurrentOTP);
 
 // Admin: update user
 userRoutes.put("/:id", authMiddleware, adminAuth, adminUpdateUser);

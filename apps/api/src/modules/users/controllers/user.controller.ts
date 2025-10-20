@@ -4,6 +4,7 @@ import User from "../models/user.model";
 import { io } from "../../../app";
 import config from "../../../config/config";
 import cloudinary from "cloudinary";
+import { createOTP, verifyOTP as verifyOTPService, checkOTPAttempts } from "../../../services/otpService";
 
 // Validation helper
 const validateEmail = (email: string): boolean => {
@@ -846,5 +847,119 @@ export const updatePrivacySettings = async (req: Request, res: Response) => {
   } catch (e) {
     console.error('Error updating privacy settings:', e);
     res.status(500).json({ error: 'Failed to update privacy settings' });
+  }
+};
+
+// OTP Controllers
+export const sendOTP = async (req: Request, res: Response) => {
+  try {
+    const { email, type = 'login' } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Check if email exists for login/admin OTP
+    if (type === 'login' || type === 'admin') {
+      // For admin, check if it's the admin email
+      if (type === 'admin' && email === 'admin@refurnish.dev') {
+        // Admin login is valid, proceed to send OTP
+      } else {
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+      }
+    }
+
+    // Check OTP attempts
+    const canSendOTP = await checkOTPAttempts(email, type);
+    if (!canSendOTP) {
+      return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
+    }
+
+    await createOTP(email, type);
+    res.status(200).json({ message: 'OTP sent successfully' });
+  } catch (error) {
+    console.error('Error sending OTP:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+};
+
+export const verifyOTP = async (req: Request, res: Response) => {
+  try {
+    const { email, otp, type = 'login' } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and OTP are required' });
+    }
+
+    const isValid = await verifyOTPService(email, otp, type);
+    
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
+
+    res.status(200).json({ message: 'OTP verified successfully' });
+  } catch (error) {
+    console.error('Error verifying OTP:', error);
+    res.status(500).json({ error: 'Failed to verify OTP' });
+  }
+};
+
+export const checkLastLogin = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.params;
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const lastLogin = user.lastActive || user.createdAt;
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    const needsOTP = lastLogin < oneMonthAgo;
+
+    res.status(200).json({ 
+      needsOTP,
+      lastLogin: lastLogin.toISOString()
+    });
+  } catch (error) {
+    console.error('Error checking last login:', error);
+    res.status(500).json({ error: 'Failed to check last login' });
+  }
+};
+
+export const getCurrentOTP = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.params;
+    const { type = 'login' } = req.query;
+
+    // Only allow in development mode
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const OTP = require('../models/otp.model').default;
+    const otpRecord = await OTP.findOne({
+      email: email.toLowerCase(),
+      type,
+      isUsed: false,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!otpRecord) {
+      return res.status(404).json({ error: 'No active OTP found' });
+    }
+
+    res.status(200).json({ 
+      otp: otpRecord.otp,
+      expiresAt: otpRecord.expiresAt
+    });
+  } catch (error) {
+    console.error('Error getting current OTP:', error);
+    res.status(500).json({ error: 'Failed to get current OTP' });
   }
 };

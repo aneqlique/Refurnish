@@ -23,6 +23,8 @@ import cartRoutes from "./modules/carts/routes/cart.routes";
 import wishlistRoutes from "./modules/wishlists/routes/wishlist.routes";
 import sellerProfileRoutes from "./modules/users/routes/seller-profile.route";
 import messagesRoutes from "./modules/messages/routes/messages.route";
+import adminRoutes from "./modules/admin/routes/admin.route";
+import contentRoutes from "./modules/content/routes/content.route";
 
 const app = express();
 
@@ -78,6 +80,8 @@ app.use("/api/site-visits", siteVisitRoutes);
 app.use("/api/chat", messagesRoutes);
 app.use("/api/carts", cartRoutes);
 app.use("/api/wishlists", wishlistRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/content", contentRoutes);
 
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
