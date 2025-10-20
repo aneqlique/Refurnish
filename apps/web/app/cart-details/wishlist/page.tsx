@@ -226,6 +226,7 @@ function CartTabs() {
   const tabs = [
     { href: "/cart-details/cart", label: "CART" },
     { href: "/cart-details/wishlist", label: "WISHLIST" },
+    { href: "/cart-details/swap", label: "SWAP" },
     { href: "/cart-details/track-orders", label: "TRACK ORDERS" },
   ];
 

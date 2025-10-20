@@ -7,6 +7,8 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useSearchParams, useRouter } from 'next/navigation';
 import ChatBubble from '../../components/ChatBubble';
 import { useCartContext } from '../../contexts/CartContext';
+import { useSwap } from '../../hooks/useSwap';
+import { useAuth } from '../../contexts/AuthContext';
 import { useWishlistContext } from '../../contexts/WishlistContext';
 
 if (typeof window !== "undefined") {
@@ -82,6 +84,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://refurnish-backe
 export default function ItemViewSwapPage() {
   const cart = useCartContext();
   const wishlist = useWishlistContext();
+  const { createSwap } = useSwap();
+  const { isAuthenticated } = useAuth();
   const navbarRef = useRef<HTMLElement>(null);
   const searchParams = useSearchParams();
   const [currentSwapProduct, setCurrentSwapProduct] = useState<SwapProduct>(fallbackSwapProduct);
@@ -368,7 +372,22 @@ export default function ItemViewSwapPage() {
                     {isLiked ? 'Liked' : 'Like'}
                   </div>
                 </button>
-                <button className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-(--color-olive) text-white rounded-full font-medium hover:bg-(--color-primary) transition-colors text-sm sm:text-base">
+                <button
+                  onClick={async () => {
+                    if (!isAuthenticated) {
+                      alert('Please login to initiate a swap');
+                      return;
+                    }
+                    try {
+                      await createSwap(currentSwapProduct.id, `Interested to swap for: ${currentSwapProduct.wantItem}`);
+                      alert('A message was sent to the seller');
+                      window.location.href = '/cart-details/swap';
+                    } catch (e) {
+                      alert('Failed to create swap. Please try again.');
+                    }
+                  }}
+                  className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-(--color-olive) text-white rounded-full font-medium hover:bg-(--color-primary) transition-colors text-sm sm:text-base"
+                >
                   <div className="flex items-center justify-center gap-2">
                     <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />

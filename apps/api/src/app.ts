@@ -26,6 +26,7 @@ import messagesRoutes from "./modules/messages/routes/messages.route";
 import adminRoutes from "./modules/admin/routes/admin.route";
 import contentRoutes from "./modules/content/routes/content.route";
 import trackOrderRoutes from "./modules/trackorders/routes/trackorder.routes";
+import swapRoutes from "./modules/swaps/routes/swap.routes";
 
 const app = express();
 
@@ -90,6 +91,7 @@ app.use("/api/site-visits", siteVisitRoutes);
 app.use("/api/chat", messagesRoutes);
 app.use("/api/carts", cartRoutes);
 app.use("/api/wishlists", wishlistRoutes);
+app.use("/api/swaps", swapRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/content", contentRoutes);
 app.use("/api/orders", trackOrderRoutes);
