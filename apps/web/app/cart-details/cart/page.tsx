@@ -7,6 +7,9 @@ import { usePathname } from "next/navigation";
 import Footer from '../../../components/Footer';
 import { useMemo, useState } from "react";
 import { useCartContext } from '../../../contexts/CartContext';
+import { useTrackOrders } from '../../../hooks/useTrackOrders';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 type CartItem = {
   id: string | number;
@@ -341,7 +344,7 @@ function SiteHeader() {
 
         <div className="ml-auto flex items-center gap-3">
           <button className="size-9 rounded-full hover:bg-neutral-100 flex items-center justify-center relative">
-            <img src="/icon/cartIcon.png" alt="Cart" className="h-4 w-auto" />
+            <Image src="/icon/cartIcon.png" alt="Cart" width={16} height={16} className="h-4 w-auto" />
             {cart.cartCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
                 {cart.cartCount}
@@ -406,6 +409,43 @@ function CheckoutModal({
   onClose: () => void;
 }) {
   const total = subtotal + shippingFee;
+  const { placeOrder } = useTrackOrders();
+  const { user } = useAuth();
+  const router = useRouter();
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [shippingAddress, setShippingAddress] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const handlePlaceOrder = async () => {
+    if (!user) {
+      alert('Please log in to place an order');
+      return;
+    }
+
+    if (!shippingAddress.trim()) {
+      alert('Please enter a shipping address');
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    try {
+      const selectedItems = items.map(item => item.id.toString());
+      await placeOrder({
+        selectedItems,
+        shippingAddress: shippingAddress.trim(),
+        notes: notes.trim() || undefined,
+      });
+      
+      // Close modal and redirect to track orders
+      onClose();
+      router.push('/cart-details/track-orders');
+    } catch (error) {
+      console.error('Error placing order:', error);
+      alert('Failed to place order. Please try again.');
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
   return (
     <div className="fixed inset-0 font-sans z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
@@ -416,15 +456,31 @@ function CheckoutModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
               <div className="text-neutral-700">
                 <p className="font-semibold mb-2">Your Details :</p>
-                <p>Name : Son Chaeyoung</p>
-                <p>Contact No. : 099898333953</p>
-                <p>Email : district8@gmail.com</p>
+                <p>Name : {user?.firstName} {user?.lastName}</p>
+                <p>Email : {user?.email}</p>
               </div>
               <div className="text-neutral-700">
-                <p className="font-semibold mb-2">Address :</p>
-                <p>Brgy. 29, Cavite City, Cavite, 4100</p>
-                <p>2129 Block 23, Dunchondong St.</p>
+                <p className="font-semibold mb-2">Shipping Address :</p>
+                <textarea
+                  value={shippingAddress}
+                  onChange={(e) => setShippingAddress(e.target.value)}
+                  placeholder="Enter your complete shipping address..."
+                  className="w-full h-20 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                />
               </div>
+            </div>
+
+            <div className="mt-6">
+              <label className="block text-neutral-700 font-semibold mb-2">
+                Additional Notes (Optional):
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Any special instructions for your order..."
+                className="w-full h-16 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
             </div>
 
             <p className="mt-8 font-semibold text-neutral-800">Your Order(s) :</p>
@@ -475,8 +531,27 @@ function CheckoutModal({
             </div>
 
             <div className="flex items-center gap-4 pt-4">
-              <button onClick={onClose} className="h-12 px-6 rounded-full ring-1 ring-black/[0.08] bg-white">Cancel</button>
-              <button className="h-12 px-6 rounded-full bg-[#636B2F] text-white">Place Order</button>
+              <button 
+                onClick={onClose} 
+                disabled={isPlacingOrder}
+                className="h-12 px-6 rounded-full ring-1 ring-black/[0.08] bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handlePlaceOrder}
+                disabled={isPlacingOrder || !shippingAddress.trim()}
+                className="h-12 px-6 rounded-full bg-[#636B2F] text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isPlacingOrder ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Placing Order...
+                  </>
+                ) : (
+                  'Place Order'
+                )}
+              </button>
             </div>
           </div>
         </div>
