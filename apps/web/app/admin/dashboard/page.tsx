@@ -690,9 +690,9 @@ const AdminDashboard: React.FC = () => {
                           <p className="text-sm font-medium text-gray-900 truncate">{product.title}</p>
                           <p className="text-sm text-gray-600">{product.category} • {product.location}</p>
                           <div className="flex items-center space-x-4 mt-1">
-                            <span className="text-xs text-gray-500">₱{product.price.toLocaleString()}</span>
-                            {product.salesCount > 0 && (
-                              <span className="text-xs text-green-600 font-medium">{product.salesCount} sales</span>
+                            <span className="text-xs text-gray-500">₱{((product?.price ?? 0) as number).toLocaleString()}</span>
+                            {(product?.salesCount ?? 0) > 0 && (
+                              <span className="text-xs text-green-600 font-medium">{product?.salesCount ?? 0} sales</span>
                             )}
                           </div>
                         </div>
