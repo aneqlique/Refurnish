@@ -5,11 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Footer from '../../../components/Footer';
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useCartContext } from '../../../contexts/CartContext';
 import { useTrackOrders } from '../../../hooks/useTrackOrders';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import PaymentMockupModal from '../../../components/PaymentMockupModal';
 
 type CartItem = {
   id: string | number;
@@ -19,6 +20,7 @@ type CartItem = {
   thumbnailSrc?: string;
   selected: boolean;
 };
+
 
 const currency = new Intl.NumberFormat("en-PH", {
   style: "currency",
@@ -416,6 +418,25 @@ function CheckoutModal({
   const [shippingAddress, setShippingAddress] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Payment modal state
+  const [paymentModalOpen, setPaymentModalOpen] = useState<boolean>(false);
+  const [paymentModalProps, setPaymentModalProps] = useState<{ provider: string; txnId?: string }>({ provider: "gcash" });
+
+  const [selection, setSelection] = useState({
+    paymentMode: "Cash on Delivery",
+    ewalletOption: "gcash",
+    cardType: "debit",
+    deliveryMode: "LBC Express",
+  });
+
+  const [notice, setNotice] = useState<{ type: "info" | "error" | "success"; message: string } | null>(null);
+  const [cardValid, setCardValid] = useState(false);
+  const [attemptedCardSubmit, setAttemptedCardSubmit] = useState(false);
+
+  const handleSelectionChange = useCallback((s: any) => {
+    setSelection(s);
+  }, []);
+
   const handlePlaceOrder = async () => {
     if (!user) {
       alert('Please log in to place an order');
@@ -427,6 +448,38 @@ function CheckoutModal({
       return;
     }
 
+    // If user selected an e-wallet, open the payment mockup modal
+    if (selection.paymentMode === "Ewallet") {
+      const provider = selection.ewalletOption || "gcash";
+      const txnId = `txn_${Date.now().toString(36).slice(-8)}`;
+      setPaymentModalProps({ provider, txnId });
+      setPaymentModalOpen(true);
+      return;
+    }
+
+    // Cash on Delivery: treat as immediate order placement success
+    if (selection.paymentMode === "Cash on Delivery") {
+      const txnId = `cod_${Date.now().toString(36).slice(-8)}`;
+      handlePaymentSuccess({ status: "SOLD", txnId, amount: total });
+      return;
+    }
+
+    // Debit/Credit: require valid card inputs before proceeding
+    if (selection.paymentMode === "Debit/Credit") {
+      setAttemptedCardSubmit(true);
+      if (!cardValid) {
+        return;
+      }
+      const txnId = `card_${Date.now().toString(36).slice(-8)}`;
+      handlePaymentSuccess({ status: "SOLD", txnId, amount: total });
+      return;
+    }
+  };
+
+  const handlePaymentSuccess = async (payload: { status: "SOLD"; txnId: string; amount: number }) => {
+    console.log("Payment success", payload);
+    setPaymentModalOpen(false);
+    
     setIsPlacingOrder(true);
     try {
       const selectedItems = items.map(item => item.id.toString());
@@ -436,12 +489,10 @@ function CheckoutModal({
         notes: notes.trim() || undefined,
       });
       
-      // Close modal and redirect to track orders
-      onClose();
-      router.push('/cart-details/track-orders');
+      setNotice({ type: "success", message: "Your order has been placed successfully." });
     } catch (error) {
       console.error('Error placing order:', error);
-      alert('Failed to place order. Please try again.');
+      setNotice({ type: "error", message: "Failed to place order. Please try again." });
     } finally {
       setIsPlacingOrder(false);
     }
@@ -510,17 +561,18 @@ function CheckoutModal({
 
           <div className="space-y-6">
             <div className="space-y-4">
+              <PaymentDeliverySelector 
+                onChange={handleSelectionChange} 
+                attemptedSubmit={attemptedCardSubmit} 
+                onValidityChange={setCardValid} 
+              />
+
               <div>
-                <p className="text-neutral-700 font-medium">Mode of Payment :</p>
-                <div className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center justify-between px-4">Cash on Delivery <span>›</span></div>
-              </div>
-              <div>
-                <p className="text-neutral-700 font-medium">Mode of Delivery :</p>
-                <div className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center justify-between px-4">LBC Express <span>›</span></div>
-              </div>
-              <div>
-                <p className="text-neutral-700 font-medium">Voucher Applied :</p>
-                <div className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center px-4 text-neutral-500">NONE</div>
+                <p className="text-neutral-700 font-medium">Refurnish Voucher :</p>
+                <input 
+                  placeholder="Voucher Code" 
+                  className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center px-4 text-neutral-500 w-full"
+                />
               </div>
             </div>
 
@@ -553,8 +605,43 @@ function CheckoutModal({
                 )}
               </button>
             </div>
+
+            <PaymentMockupModal
+              open={paymentModalOpen}
+              onClose={() => setPaymentModalOpen(false)}
+              amount={total}
+              provider={paymentModalProps.provider}
+              txnId={paymentModalProps.txnId}
+              onSuccess={handlePaymentSuccess}
+            />
           </div>
         </div>
+
+        {notice && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setNotice(null)} />
+            <div className="relative mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" style={{ fontFamily: 'Fustat, Arial, Helvetica, sans-serif' }}>
+              <h3 className="text-lg font-semibold text-neutral-800 mb-2">
+                {notice.type === 'error' ? 'Something went wrong' : notice.type === 'success' ? 'Successful checkout!' : 'Notice'}
+              </h3>
+              <p className="text-sm text-neutral-700">{notice.message}</p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button 
+                  onClick={() => { 
+                    setNotice(null); 
+                    if (notice.type === 'success') {
+                      onClose();
+                      router.push('/cart-details/track-orders');
+                    }
+                  }} 
+                  className="h-10 px-4 rounded-full bg-neutral-900 text-white"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <button aria-label="Close" onClick={onClose} className="absolute top-4 right-4 size-9 rounded-full hover:bg-neutral-100 flex items-center justify-center">
           <CloseIcon />
@@ -626,6 +713,364 @@ function SearchIcon() {
     <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="size-4">
       <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" fill="currentColor" />
     </svg>
+  );
+}
+
+function PaymentDeliverySelector({ onChange, attemptedSubmit = false, onValidityChange }: { onChange?: (s: any) => void; attemptedSubmit?: boolean; onValidityChange?: (valid: boolean) => void }) {
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [deliveryOpen, setDeliveryOpen] = useState(false);
+
+  const [paymentMode, setPaymentMode] = useState("Cash on Delivery");
+  const [ewalletOption, setEwalletOption] = useState("gcash");
+  const [cardType, setCardType] = useState("debit");
+
+  const [deliveryMode, setDeliveryMode] = useState("LBC Express");
+
+  // Card inputs and errors
+  const [cardName, setCardName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState(""); // MM/YY
+  const [cardCvc, setCardCvc] = useState("");
+  const [cardErrors, setCardErrors] = useState<{ name?: string; number?: string; expiry?: string; cvc?: string }>({});
+
+  const paymentRef = useRef<HTMLDivElement | null>(null);
+  const deliveryRef = useRef<HTMLDivElement | null>(null);
+  const onChangeRef = useRef(onChange);
+
+  // Keep the ref updated with the latest onChange function
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (paymentRef.current && !paymentRef.current.contains(e.target as Node)) {
+        setPaymentOpen(false);
+      }
+      if (deliveryRef.current && !deliveryRef.current.contains(e.target as Node)) {
+        setDeliveryOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // notify parent if needed
+  useEffect(() => {
+    if (typeof onChangeRef.current === "function") {
+      onChangeRef.current({ paymentMode, ewalletOption, cardType, deliveryMode });
+    }
+  }, [paymentMode, ewalletOption, cardType, deliveryMode]);
+
+  // Validation helpers
+  function luhnCheck(num: string) {
+    let sum = 0;
+    let shouldDouble = false;
+    for (let i = num.length - 1; i >= 0; i--) {
+      let digit = parseInt(num.charAt(i), 10);
+      if (shouldDouble) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      shouldDouble = !shouldDouble;
+    }
+    return sum % 10 === 0;
+  }
+
+  function validateCard(): { valid: boolean; errors: typeof cardErrors } {
+    if (paymentMode !== "Debit/Credit") return { valid: true, errors: {} };
+    const errors: typeof cardErrors = {};
+    const digits = cardNumber.replace(/\D/g, "");
+
+    if (!cardName.trim()) {
+      errors.name = "Cardholder name is required.";
+    }
+
+    if (digits.length < 13 || digits.length > 19 || !luhnCheck(digits)) {
+      errors.number = "Enter a valid card number.";
+    }
+
+    // expiry MM/YY and not past
+    const match = cardExpiry.match(/^\s*(\d{2})\/(\d{2})\s*$/);
+    if (!match) {
+      errors.expiry = "Enter expiry as MM/YY.";
+    } else {
+      const mm = parseInt(match[1], 10);
+      const yy = parseInt(match[2], 10);
+      if (mm < 1 || mm > 12) {
+        errors.expiry = "Invalid expiry month.";
+      } else {
+        const now = new Date();
+        const curYY = now.getFullYear() % 100;
+        const curMM = now.getMonth() + 1;
+        if (yy < curYY || (yy === curYY && mm < curMM)) {
+          errors.expiry = "Card is expired.";
+        }
+      }
+    }
+
+    if (!/^\d{3,4}$/.test(cardCvc)) {
+      errors.cvc = "CVC must be 3–4 digits.";
+    }
+
+    return { valid: Object.keys(errors).length === 0, errors };
+  }
+
+  // Recompute validity on relevant changes and report to parent
+  useEffect(() => {
+    const { valid, errors } = validateCard();
+    setCardErrors(errors);
+    if (typeof onValidityChange === "function") onValidityChange(valid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentMode, cardName, cardNumber, cardExpiry, cardCvc]);
+
+  const paymentOptions = ["Cash on Delivery", "Ewallet", "Debit/Credit"];
+  const ewalletOptions = [
+    { id: "gcash", label: "", logo: "/icon/GCash_logo.png" },
+    { id: "paymaya", label: "", logo: "/icon/maya.jpg" },
+  ];
+  const deliveryOptions = [
+    "LBC Express",
+    "J&T Express",
+    "GGX",
+    "Ninja Van",
+    "Xend",
+    "2GO",
+    "GrabExpress",
+  ];
+
+  return (
+    <div className="space-y-4 w-full">
+      {/* Mode of Payment */}
+      <div>
+        <p className="text-neutral-700 font-medium">Mode of Payment :</p>
+
+        <div ref={paymentRef} className="relative">
+          <button
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={paymentOpen}
+            onClick={() => setPaymentOpen((s) => !s)}
+            className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center justify-between px-4 w-full bg-white"
+          >
+            <span className="text-left truncate">{paymentMode}</span>
+            <span className="ml-3 text-neutral-400">›</span>
+          </button>
+
+          {paymentOpen && (
+            <ul
+              role="listbox"
+              tabIndex={-1}
+              className="absolute z-10 mt-2 w-full rounded-lg bg-white ring-1 ring-black/[0.06] shadow-lg divide-y divide-neutral-100 max-h-56 overflow-auto"
+            >
+              {paymentOptions.map((opt) => (
+                <li
+                  key={opt}
+                  role="option"
+                  aria-selected={paymentMode === opt}
+                  onClick={() => {
+                    setPaymentMode(opt);
+                    setPaymentOpen(false);
+                  }}
+                  className="px-4 py-3 cursor-pointer hover:bg-neutral-50"
+                >
+                  {opt}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="mt-3">
+          {paymentMode === "Ewallet" && (
+            <div className="rounded-xl ring-1 ring-black/[0.06] p-3 bg-white">
+              <p className="text-sm font-medium text-neutral-700 mb-2">Choose e-wallet:</p>
+              <div className="flex gap-4 items-center flex-wrap">
+                {ewalletOptions.map((w) => (
+                  <label key={w.id} className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="ewallet"
+                      value={w.id}
+                      checked={ewalletOption === w.id}
+                      onChange={() => setEwalletOption(w.id)}
+                      className="cursor-pointer"
+                    />
+
+                    <Image
+                      src={w.logo}
+                      alt={w.label}
+                      width={20}
+                      height={20}
+                      className="h-5 w-auto object-contain"
+                    />
+
+                    <span className="text-sm">{w.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-3 text-sm text-neutral-600">
+                {ewalletOption === "gcash" && <p>You'll be redirected to GCash to complete the payment.</p>}
+                {ewalletOption === "paymaya" && <p>You'll be redirected to PayMaya to complete the payment.</p>}
+              </div>
+            </div>
+          )}
+
+          {paymentMode === "Debit/Credit" && (
+            <div className="rounded-xl ring-1 ring-black/[0.06] p-3 bg-white">
+              {attemptedSubmit && Object.keys(cardErrors).length > 0 && (
+                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm" role="alert" style={{ fontFamily: 'Fustat, Arial, Helvetica, sans-serif' }}>
+                  Please correct the highlighted card details.
+                </div>
+              )}
+
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-neutral-700">Card type:</p>
+                <div className="flex items-center gap-2">
+                  <Image src="/icon/visa.png" alt="Visa" width={20} height={20} className="h-5" />
+                  <Image src="/icon/card.png" alt="Mastercard" width={20} height={20} className="h-5" />
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-center">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="cardType"
+                    value="debit"
+                    checked={cardType === "debit"}
+                    onChange={() => setCardType("debit")}
+                  />
+                  <span className="text-sm">Debit</span>
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="cardType"
+                    value="credit"
+                    checked={cardType === "credit"}
+                    onChange={() => setCardType("credit")}
+                  />
+                  <span className="text-sm">Credit</span>
+                </label>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-2">
+                <div>
+                  <input
+                    placeholder="Cardholder name"
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value)}
+                    className={`w-full rounded-md border px-3 py-2 text-sm ${attemptedSubmit && cardErrors.name ? 'border-red-300' : 'border-neutral-200'}`}
+                  />
+                  {attemptedSubmit && cardErrors.name && (
+                    <p className="mt-1 text-xs text-red-600">{cardErrors.name}</p>
+                  )}
+                </div>
+                <div>
+                  <input
+                    placeholder="Card number"
+                    inputMode="numeric"
+                    maxLength={23}
+                    value={cardNumber}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 19);
+                      // group in 4s
+                      const grouped = digits.replace(/(.{4})/g, '$1 ').trim();
+                      setCardNumber(grouped);
+                    }}
+                    className={`w-full rounded-md border px-3 py-2 text-sm tabular-nums ${attemptedSubmit && cardErrors.number ? 'border-red-300' : 'border-neutral-200'}`}
+                  />
+                  {attemptedSubmit && cardErrors.number && (
+                    <p className="mt-1 text-xs text-red-600">{cardErrors.number}</p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <div className="w-1/2">
+                    <input
+                      placeholder="MM/YY"
+                      maxLength={5}
+                      value={cardExpiry}
+                      onChange={(e) => {
+                        let v = e.target.value.replace(/[^\d]/g, '').slice(0, 4);
+                        if (v.length >= 3) v = v.slice(0,2) + '/' + v.slice(2);
+                        else if (v.length >= 1 && parseInt(v[0],10) > 1) v = '0' + v[0] + (v[1] ? '/' + v.slice(1) : '');
+                        setCardExpiry(v);
+                      }}
+                      className={`w-full rounded-md border px-3 py-2 text-sm ${attemptedSubmit && cardErrors.expiry ? 'border-red-300' : 'border-neutral-200'}`}
+                    />
+                    {attemptedSubmit && cardErrors.expiry && (
+                      <p className="mt-1 text-xs text-red-600">{cardErrors.expiry}</p>
+                    )}
+                  </div>
+                  <div className="w-1/2">
+                    <input
+                      placeholder="CVC"
+                      inputMode="numeric"
+                      maxLength={4}
+                      value={cardCvc}
+                      onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0,4))}
+                      className={`w-full rounded-md border px-3 py-2 text-sm tabular-nums ${attemptedSubmit && cardErrors.cvc ? 'border-red-300' : 'border-neutral-200'}`}
+                    />
+                    {attemptedSubmit && cardErrors.cvc && (
+                      <p className="mt-1 text-xs text-red-600">{cardErrors.cvc}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {paymentMode === "Cash on Delivery" && (
+            <div className="mt-2 text-sm text-neutral-600">Pay with cash when your order is delivered.</div>
+          )}
+        </div>
+
+      </div>
+
+      {/* Mode of Delivery */}
+      <div>
+        <p className="text-neutral-700 font-medium">Mode of Delivery :</p>
+
+        <div ref={deliveryRef} className="relative">
+          <button
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={deliveryOpen}
+            onClick={() => setDeliveryOpen((s) => !s)}
+            className="mt-2 h-11 rounded-xl ring-1 ring-black/[0.08] flex items-center justify-between px-4 w-full bg-white"
+          >
+            <span className="text-left truncate">{deliveryMode}</span>
+            <span className="ml-3 text-neutral-400">›</span>
+          </button>
+
+          {deliveryOpen && (
+            <ul
+              role="listbox"
+              tabIndex={-1}
+              className="absolute z-10 mt-2 w-full rounded-lg bg-white ring-1 ring-black/[0.06] shadow-lg divide-y divide-neutral-100 max-h-56 overflow-auto"
+            >
+              {deliveryOptions.map((opt) => (
+                <li
+                  key={opt}
+                  role="option"
+                  aria-selected={deliveryMode === opt}
+                  onClick={() => {
+                    setDeliveryMode(opt);
+                    setDeliveryOpen(false);
+                  }}
+                  className="px-4 py-3 cursor-pointer hover:bg-neutral-50"
+                >
+                  {opt}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
