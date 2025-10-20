@@ -257,18 +257,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
+    // Clear state immediately
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
     // Use NextAuth signOut for Google OAuth users
     if (session) {
       nextAuthSignOut({ callbackUrl: '/' });
     } else {
-      // For regular users, just clear local state
+      // For regular users, navigate to home
       router.push('/');
-      setTimeout(() => {
-        setUser(null);
-        setToken(null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }, 100);
     }
   };
 

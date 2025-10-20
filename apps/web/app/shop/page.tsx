@@ -255,7 +255,7 @@ export default function Shop() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      window.location.href = `/product-catalog-sale?search=${encodeURIComponent(searchQuery)}`;
+      window.location.href = `/product-catalog?search=${encodeURIComponent(searchQuery)}`;
     }
   };
 

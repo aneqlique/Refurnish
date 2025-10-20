@@ -54,6 +54,7 @@ export default function Home() {
   // Product state
   const [featuredProducts, setFeaturedProducts] = useState<DisplayProduct[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Use shared hooks
   const cart = useCart();
@@ -96,17 +97,35 @@ export default function Home() {
     }
   }, [announcements, isLoading]);
 
-  // Fetch featured products from API
+  // Fetch featured products from API with retry logic
   useEffect(() => {
-    const fetchFeaturedProducts = async () => {
+    const fetchFeaturedProducts = async (retryCount = 0) => {
       try {
         setIsLoadingProducts(true);
+        setFetchError(null);
+        console.log(`Fetching featured products (attempt ${retryCount + 1}) from:`, `${API_BASE_URL}/api/products?status=listed`);
         
         // Fetch products with status="listed" (both sale and swap)
-        const res = await fetch(`${API_BASE_URL}/api/products?status=listed`);
+        const res = await fetch(`${API_BASE_URL}/api/products?status=listed`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // Add timeout
+          signal: AbortSignal.timeout(10000), // 10 second timeout
+        });
+        
         const data: BackendProduct[] = await res.json();
         
-        if (!res.ok) throw new Error('Failed to load products');
+        console.log('API Response:', { status: res.status, ok: res.ok, dataLength: data?.length });
+        
+        if (!res.ok) {
+          throw new Error(`Failed to load products: ${res.status} ${res.statusText}`);
+        }
+
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid data format received from API');
+        }
 
         // Transform and limit to 8 featured products
         const transformed: DisplayProduct[] = data.slice(0, 8).map((p) => ({
@@ -119,10 +138,23 @@ export default function Home() {
           listedAs: p.listedAs || 'sale',
         }));
 
+        console.log('Transformed products:', transformed);
         setFeaturedProducts(transformed);
+        setFetchError(null);
       } catch (error) {
         console.error('Error fetching featured products:', error);
-        setFeaturedProducts([]);
+        
+        // Retry up to 2 times
+        if (retryCount < 2) {
+          console.log(`Retrying in 2 seconds... (attempt ${retryCount + 2})`);
+          setTimeout(() => {
+            fetchFeaturedProducts(retryCount + 1);
+          }, 2000);
+          return;
+        }
+        
+        setFetchError(error instanceof Error ? error.message : 'Failed to load products');
+        console.log('Max retries reached, showing error state');
       } finally {
         setIsLoadingProducts(false);
       }
