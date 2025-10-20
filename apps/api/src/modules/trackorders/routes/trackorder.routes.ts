@@ -4,7 +4,9 @@ import {
   getUserOrders, 
   getOrderById, 
   updateOrderStatus, 
-  getAllOrders 
+  getAllOrders,
+  getSellerOrders,
+  updateSellerOrderStatus
 } from '../controllers/trackorder.controller';
 import authMiddleware from '../../../middleware/auth';
 import adminAuthMiddleware from '../../../middleware/adminAuth';
@@ -19,6 +21,10 @@ router.get('/my-orders', authMiddleware, getUserOrders);
 
 // Get specific order by ID (authenticated users)
 router.get('/:orderId', authMiddleware, getOrderById);
+
+// Seller endpoints
+router.get('/seller/orders', authMiddleware, getSellerOrders);
+router.put('/seller/:orderId/status', authMiddleware, updateSellerOrderStatus);
 
 // Update order status (admin only)
 router.put('/:orderId/status', adminAuthMiddleware, updateOrderStatus);

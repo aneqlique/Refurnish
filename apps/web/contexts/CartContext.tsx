@@ -14,6 +14,9 @@ interface CartContextType {
   cartCount: number;
   getCartCount: () => void;
   isBackendAvailable: boolean;
+  refreshCartAfterCheckout: () => Promise<void>;
+  removeOrderedItemsFromCart: (orderedItemIds: string[]) => Promise<void>;
+  clearCartAfterCheckout: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);

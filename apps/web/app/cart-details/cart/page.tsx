@@ -413,6 +413,7 @@ function CheckoutModal({
   const total = subtotal + shippingFee;
   const { placeOrder } = useTrackOrders();
   const { user } = useAuth();
+  const { refreshCartAfterCheckout } = useCartContext();
   const router = useRouter();
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [shippingAddress, setShippingAddress] = useState('');
@@ -487,6 +488,11 @@ function CheckoutModal({
         selectedItems,
         shippingAddress: shippingAddress.trim(),
         notes: notes.trim() || undefined,
+      }, {
+        onSuccess: () => {
+          // Refresh cart to remove only the ordered items (backend handles selective removal)
+          refreshCartAfterCheckout();
+        }
       });
       
       setNotice({ type: "success", message: "Your order has been placed successfully." });

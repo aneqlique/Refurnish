@@ -27,6 +27,16 @@ export default function TrackOrdersPage() {
 
       <main className="mx-auto w-full font-sans max-w-6xl px-4 sm:px-6 md:px-8 flex-1">
         <CartTabs />
+        
+        {/* Back to Products Navigation */}
+        <Link href="/product-catalog-sale" className="inline-flex items-center gap-2 mb-4 sm:mb-6 text-(--color-primary) hover:text-(--color-olive) transition-colors">
+          <div className="w-6 h-6 sm:w-7 sm:h-7 bg-(--color-primary) rounded-full flex items-center justify-center">
+            <svg className="w-3 h-3 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </div>
+          <span className="text-xs sm:text-sm font-medium">Back to Products</span>
+        </Link>
 
         <div className="mt-6 rounded-2xl bg-white font-sans shadow-sm ring-1 ring-black/[0.06]">
           <div className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 sm:px-6 py-4 text-sm font-semibold text-[#273815] font-sans">

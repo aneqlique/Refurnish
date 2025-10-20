@@ -36,6 +36,11 @@ interface PlaceOrderData {
   notes?: string;
 }
 
+interface PlaceOrderOptions {
+  onSuccess?: () => void;
+  onError?: (error: Error) => void;
+}
+
 // Health check function
 const checkBackendHealth = async (): Promise<boolean> => {
   try {
@@ -100,7 +105,7 @@ export function useTrackOrders() {
   }, [token, user]);
 
   // Place a new order
-  const placeOrder = useCallback(async (orderData: PlaceOrderData) => {
+  const placeOrder = useCallback(async (orderData: PlaceOrderData, options?: PlaceOrderOptions) => {
     if (!token || !user) {
       throw new Error('User not authenticated');
     }
@@ -128,10 +133,21 @@ export function useTrackOrders() {
       // Refresh orders after placing a new one
       await fetchOrders();
       
+      // Call success callback if provided
+      if (options?.onSuccess) {
+        options.onSuccess();
+      }
+      
       return result;
     } catch (err) {
       console.error('Error placing order:', err);
       setError(err instanceof Error ? err.message : 'Failed to place order');
+      
+      // Call error callback if provided
+      if (options?.onError && err instanceof Error) {
+        options.onError(err);
+      }
+      
       throw err;
     } finally {
       setIsLoading(false);
