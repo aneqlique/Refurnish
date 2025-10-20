@@ -29,20 +29,25 @@ const CartItemSchema = new Schema<ICartItem>({
   },
   price: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
   },
   name: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   image: {
-    type: String
+    type: String,
+    default: ''
   },
   location: {
-    type: String
+    type: String,
+    default: ''
   },
   category: {
-    type: String
+    type: String,
+    default: ''
   }
 });
 

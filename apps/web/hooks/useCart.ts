@@ -13,7 +13,7 @@ export interface CartItem {
   quantity: number;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://refurnish-backend.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 // Health check function
 const checkBackendHealth = async (): Promise<boolean> => {
@@ -172,7 +172,7 @@ export function useCart() {
     }
   };
 
-  const addToCart = async (product: any) => {
+  const addToCart = async (product: any, useLocalStorage = false) => {
     const cartItem: CartItem = {
       id: product.id.toString(),
       name: product.name,
@@ -184,8 +184,8 @@ export function useCart() {
       quantity: 1
     };
 
-    // If backend is not available or user not authenticated, use local storage
-    if (!isBackendAvailable || !user || !token) {
+    // If backend is not available, user not authenticated, or explicitly using local storage
+    if (!isBackendAvailable || !user || !token || useLocalStorage) {
       const existingItemIndex = cartItems.findIndex(item => item.id === cartItem.id);
       
       if (existingItemIndex > -1) {
@@ -206,43 +206,50 @@ export function useCart() {
     }
 
     try {
+      const requestData = {
+        productId: product.id.toString(),
+        quantity: 1,
+        price: product.priceNum,
+        name: product.name,
+        image: product.image,
+        location: product.location,
+        category: product.category
+      };
+      
+      console.log('Sending cart request:', requestData);
+      console.log('Product object:', product);
+      
       const response = await fetch(`${API_BASE_URL}/api/carts/add`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          productId: product.id.toString(),
-          quantity: 1,
-          price: product.priceNum,
-          name: product.name,
-          image: product.image,
-          location: product.location,
-          category: product.category
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (response.ok) {
         // Reload cart from backend
         await loadCartFromBackend();
       } else {
+        const errorData = await response.text();
         console.error('Failed to add item to cart:', response.status, response.statusText);
+        console.error('Error response:', errorData);
         setIsBackendAvailable(false);
-        // Fallback to local storage
-        addToCart(product); // This will now use local storage
+        // Fallback to local storage - prevent infinite recursion
+        addToCart(product, true);
       }
     } catch (error) {
       console.error('Error adding to cart:', error);
       setIsBackendAvailable(false);
-      // Fallback to local storage
-      addToCart(product); // This will now use local storage
+      // Fallback to local storage - prevent infinite recursion
+      addToCart(product, true);
     }
   };
 
-  const removeFromCart = async (productId: string | number) => {
-    // If backend is not available or user not authenticated, use local storage
-    if (!isBackendAvailable || !user || !token) {
+  const removeFromCart = async (productId: string | number, useLocalStorage = false) => {
+    // If backend is not available, user not authenticated, or explicitly using local storage
+    if (!isBackendAvailable || !user || !token || useLocalStorage) {
       const updatedItems = cartItems.filter(item => item.id !== productId);
       setCartItems(updatedItems);
       setCartCount(updatedItems.reduce((total, item) => total + item.quantity, 0));
@@ -265,20 +272,20 @@ export function useCart() {
       } else {
         console.error('Failed to remove item from cart');
         setIsBackendAvailable(false);
-        // Fallback to local storage
-        removeFromCart(productId); // This will now use local storage
+        // Fallback to local storage - prevent infinite recursion
+        removeFromCart(productId, true);
       }
     } catch (error) {
       console.error('Error removing from cart:', error);
       setIsBackendAvailable(false);
-      // Fallback to local storage
-      removeFromCart(productId); // This will now use local storage
+      // Fallback to local storage - prevent infinite recursion
+      removeFromCart(productId, true);
     }
   };
 
-  const updateQuantity = async (productId: string | number, quantity: number) => {
-    // If backend is not available or user not authenticated, use local storage
-    if (!isBackendAvailable || !user || !token) {
+  const updateQuantity = async (productId: string | number, quantity: number, useLocalStorage = false) => {
+    // If backend is not available, user not authenticated, or explicitly using local storage
+    if (!isBackendAvailable || !user || !token || useLocalStorage) {
       const updatedItems = cartItems.map(item => 
         item.id === productId ? { ...item, quantity } : item
       ).filter(item => item.quantity > 0);
@@ -304,14 +311,14 @@ export function useCart() {
       } else {
         console.error('Failed to update item quantity');
         setIsBackendAvailable(false);
-        // Fallback to local storage
-        updateQuantity(productId, quantity); // This will now use local storage
+        // Fallback to local storage - prevent infinite recursion
+        updateQuantity(productId, quantity, true);
       }
     } catch (error) {
       console.error('Error updating quantity:', error);
       setIsBackendAvailable(false);
-      // Fallback to local storage
-      updateQuantity(productId, quantity); // This will now use local storage
+      // Fallback to local storage - prevent infinite recursion
+      updateQuantity(productId, quantity, true);
     }
   };
 
@@ -323,9 +330,9 @@ export function useCart() {
     }, 0);
   };
 
-  const clearCart = async () => {
-    // If backend is not available or user not authenticated, use local storage
-    if (!isBackendAvailable || !user || !token) {
+  const clearCart = async (useLocalStorage = false) => {
+    // If backend is not available, user not authenticated, or explicitly using local storage
+    if (!isBackendAvailable || !user || !token || useLocalStorage) {
       setCartItems([]);
       setCartCount(0);
       saveCartToLocalStorage([]);
@@ -347,14 +354,14 @@ export function useCart() {
       } else {
         console.error('Failed to clear cart');
         setIsBackendAvailable(false);
-        // Fallback to local storage
-        clearCart(); // This will now use local storage
+        // Fallback to local storage - prevent infinite recursion
+        clearCart(true);
       }
     } catch (error) {
       console.error('Error clearing cart:', error);
       setIsBackendAvailable(false);
-      // Fallback to local storage
-      clearCart(); // This will now use local storage
+      // Fallback to local storage - prevent infinite recursion
+      clearCart(true);
     }
   };
 
@@ -369,6 +376,7 @@ export function useCart() {
     clearCart,
     cartCount,
     getCartCount,
-    isBackendAvailable
+    isBackendAvailable,
+    refreshCart: loadCartFromBackend
   };
 }

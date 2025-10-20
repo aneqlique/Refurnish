@@ -48,11 +48,14 @@ export const addToCart = async (req: Request, res: Response) => {
     const userId = req.user?._id;
     const { productId, quantity = 1, price, name, image, location, category } = req.body;
 
+    console.log('Add to cart request:', { userId, productId, quantity, price, name, image, location, category });
+
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
     if (!productId || !price || !name) {
+      console.log('Validation failed:', { productId, price, name });
       return res.status(400).json({ error: 'Product ID, price, and name are required' });
     }
 
@@ -68,25 +71,37 @@ export const addToCart = async (req: Request, res: Response) => {
     
     if (existingItemIndex > -1) {
       // Update quantity if item exists
-      cart.items[existingItemIndex].quantity += quantity;
+      const newQuantity = (cart.items[existingItemIndex].quantity || 0) + (Number(quantity) || 1);
+      cart.items[existingItemIndex].quantity = newQuantity;
+      console.log('Updated existing item quantity:', { productId, newQuantity });
     } else {
       // Add new item
-      cart.items.push({
+      const newItem = {
         productId: String(productId), // Ensure productId is always a string
-        quantity,
-        price,
-        name,
-        image,
-        location,
-        category
-      });
+        quantity: Number(quantity) || 1,
+        price: Number(price) || 0,
+        name: String(name || '').trim(),
+        image: String(image || ''),
+        location: String(location || ''),
+        category: String(category || '')
+      };
+      
+      console.log('Adding new item to cart:', newItem);
+      cart.items.push(newItem);
     }
 
     await cart.save();
+    console.log('Cart saved successfully:', cart);
     res.json(cart);
   } catch (error) {
     console.error('Error adding to cart:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: req.user?._id,
+      productId: req.body?.productId
+    });
+    res.status(500).json({ error: 'Server error', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 };
 
