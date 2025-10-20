@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useSearchParams, useRouter } from 'next/navigation';
+import ChatBubble from '../../components/ChatBubble';
 import { useCartContext } from '../../contexts/CartContext';
 import { useWishlistContext } from '../../contexts/WishlistContext';
 
@@ -46,6 +47,12 @@ type SwapProduct = {
   age: string;
   description: string;
   images: string[];
+  owner?: { 
+    _id: string;
+    email: string; 
+    firstName: string; 
+    lastName: string; 
+  };
 };
 
 type SaleProduct = {
@@ -105,7 +112,8 @@ export default function ItemViewSwapPage() {
           material: p.material,
           age: p.age ? `${p.age.value} ${p.age.unit}` : '—',
           description: p.description,
-          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [Array.isArray(p.images) ? (p.images[0] || '/products/chair/view1.jpg') : '/products/chair/view1.jpg']
+          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [Array.isArray(p.images) ? (p.images[0] || '/products/chair/view1.jpg') : '/products/chair/view1.jpg'],
+          owner: p.owner
         };
         setCurrentSwapProduct(swapProduct);
 
@@ -327,7 +335,12 @@ export default function ItemViewSwapPage() {
                       </svg>
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-900 text-sm sm:text-base">{currentSwapProduct.seller}</p>
+                      <Link 
+                        href={`/user-profile/${currentSwapProduct.owner?.email || 'unknown'}`}
+                        className="font-semibold text-gray-900 text-sm sm:text-base hover:text-green-600 transition-colors cursor-pointer"
+                      >
+                        {currentSwapProduct.seller}
+                      </Link>
                       <p className="text-xs sm:text-sm text-gray-600">Verified Seller</p>
                     </div>
                   </div>
@@ -449,6 +462,18 @@ export default function ItemViewSwapPage() {
           </div>
         </footer>
       </main>
+      
+      {/* Chat Bubble */}
+      <ChatBubble 
+        sellerId={currentSwapProduct.owner?._id}
+        sellerName={currentSwapProduct.seller}
+        openWithUser={currentSwapProduct.owner ? {
+          id: currentSwapProduct.owner._id,
+          email: currentSwapProduct.owner.email,
+          firstName: currentSwapProduct.owner.firstName,
+          lastName: currentSwapProduct.owner.lastName
+        } : undefined}
+      />
     </>
   );
 }

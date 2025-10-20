@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Footer from '../../components/Footer';
+import ChatBubble from '../../components/ChatBubble';
 import { useWishlistContext } from '../../contexts/WishlistContext';
 import { useCartContext } from '../../contexts/CartContext';
 import { useSearchParams } from 'next/navigation';
@@ -47,6 +48,12 @@ type Product = {
   age: string;
   description: string;
   images: string[];
+  owner?: { 
+    _id: string;
+    email: string; 
+    firstName: string; 
+    lastName: string; 
+  };
 };
 
 const fallbackProduct: Product = {
@@ -101,7 +108,8 @@ export default function ItemViewSalePage() {
           material: p.material,
           age: p.age ? `${p.age.value} ${p.age.unit}` : '—',
           description: p.description,
-          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [Array.isArray(p.images) ? (p.images[0] || '/products/chair/view1.jpg') : '/products/chair/view1.jpg']
+          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [Array.isArray(p.images) ? (p.images[0] || '/products/chair/view1.jpg') : '/products/chair/view1.jpg'],
+          owner: p.owner
         };
         setCurrentProduct(prod);
 
@@ -438,7 +446,12 @@ export default function ItemViewSalePage() {
                        </svg>
                      </div>
                      <div>
-                       <p className="font-semibold text-gray-900 text-sm sm:text-base">{currentProduct.seller}</p>
+                       <Link 
+                         href={`/user-profile/${currentProduct.owner?.email || 'unknown'}`}
+                         className="font-semibold text-gray-900 text-sm sm:text-base hover:text-green-600 transition-colors cursor-pointer"
+                       >
+                         {currentProduct.seller}
+                       </Link>
                        <p className="text-xs sm:text-sm text-gray-600">Verified Seller</p>
                      </div>
                    </div>
@@ -650,6 +663,18 @@ export default function ItemViewSalePage() {
         {/* FOOTER */}
         <Footer />
       </main>
+      
+      {/* Chat Bubble */}
+      <ChatBubble 
+        sellerId={currentProduct.owner?._id}
+        sellerName={currentProduct.seller}
+        openWithUser={currentProduct.owner ? {
+          id: currentProduct.owner._id,
+          email: currentProduct.owner.email,
+          firstName: currentProduct.owner.firstName,
+          lastName: currentProduct.owner.lastName
+        } : undefined}
+      />
     </>
   );
 }

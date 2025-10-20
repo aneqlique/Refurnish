@@ -323,7 +323,7 @@ function SwapCatalogContent() {
                             <path d="M21 21l-3.5-3.5" strokeWidth="2" />
                           </svg>
                           <input
-                            className="bg-transparent outline-none text-sm flex-1"
+                            className="bg-transparent outline-none text-gray-800 text-sm flex-1"
                             placeholder="Search by category or title"
                             value={searchQuery}
                             onChange={(e) => {
@@ -349,7 +349,7 @@ function SwapCatalogContent() {
                           />
                           {showSuggestions && q && (
                             <div className="absolute left-0 top-full mt-2 w-full bg-white rounded-xl shadow-lg border border-gray-200 z-50">
-                              <ul className="max-h-72 overflow-auto py-2 text-sm">
+                              <ul className="max-h-72 overflow-auto py-2 text-gray-800 text-sm">
                                 {categories
                                   .filter((c) => c && c !== 'ALL')
                                   .filter((c) => c.toLowerCase().includes(q))
