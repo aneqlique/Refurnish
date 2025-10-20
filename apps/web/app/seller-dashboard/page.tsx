@@ -6,6 +6,7 @@ import UserProfileSidebar from "../../components/UserProfileSidebar";
 import Footer from '../../components/Footer';
 import NavbarMenu from "../../components/Navbar-Menu";
 import AddProductModal from "../../components/AddProductModal";
+import SellerTrackOrders from "../../components/SellerTrackOrders";
 import { DashboardStatsSkeleton, ProductsTableSkeleton, ChartSkeleton } from "../../components/SkeletonLoader";
 // import SellerRegistrationModal from "../../components/SellerRegistrationModal";
 import { useAuth } from '../../contexts/AuthContext';
@@ -781,7 +782,8 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                     {[
                         { name: 'Dashboard', icon: TrendingUp },
                         { name: 'Products', icon: Package },
-                        { name: 'Orders', icon: ClipboardList }
+                        { name: 'Orders', icon: ClipboardList },
+                        { name: 'Track Orders', icon: BarChart3 }
                     ].map((tab) => {
                         const Icon = tab.icon;
 
@@ -1665,6 +1667,9 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                                         ) : (
                                             renderOrdersTable()
                                         )
+                                    )}
+                                    {sellerActiveTab === 'Track Orders' && (
+                                        <SellerTrackOrders />
                                     )}
                                 
                         </div>

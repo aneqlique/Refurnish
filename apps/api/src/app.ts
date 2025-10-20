@@ -25,6 +25,7 @@ import sellerProfileRoutes from "./modules/users/routes/seller-profile.route";
 import messagesRoutes from "./modules/messages/routes/messages.route";
 import adminRoutes from "./modules/admin/routes/admin.route";
 import contentRoutes from "./modules/content/routes/content.route";
+import trackOrderRoutes from "./modules/trackorders/routes/trackorder.routes";
 
 const app = express();
 
@@ -32,15 +33,14 @@ const app = express();
 app.use(
   cors({
     origin: [
-      'http://localhost:3000',           // Local development
-      'http://localhost:3001',           // Alternative local port
-      'https://refurnish.vercel.app',    // Production Vercel domain
-      'https://refurnish-blond.vercel.app', // Alternative Vercel domain
-      
+      "http://localhost:3000", // Local development
+      "http://localhost:3001", // Alternative local port
+      "https://refurnish.vercel.app", // Production Vercel domain
+      "https://refurnish-blond.vercel.app", // Alternative Vercel domain
     ],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
   })
 );
 app.use(express.json());
@@ -49,19 +49,29 @@ app.get("/", (req, res) => {
   res.send("Refurnish E-commerce API is running");
 });
 
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    message: "Refurnish E-commerce API is running",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
 //Socket.io setup
 const httpServer = http.createServer(app);
 const io = new SocketIOServer(httpServer, {
   cors: {
     origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://refurnish.vercel.app',
-      'https://refurnish-blond.vercel.app',
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://refurnish.vercel.app",
+      "https://refurnish-blond.vercel.app",
     ],
     credentials: true,
-    methods: ['GET', 'POST']
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
 // Middleware to attach io to requests
@@ -82,6 +92,7 @@ app.use("/api/carts", cartRoutes);
 app.use("/api/wishlists", wishlistRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/content", contentRoutes);
+app.use("/api/orders", trackOrderRoutes);
 
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
