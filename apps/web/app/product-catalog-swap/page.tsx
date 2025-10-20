@@ -68,6 +68,8 @@ function SwapCatalogContent() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -263,6 +265,13 @@ function SwapCatalogContent() {
   }
 
   // Apply sorting
+  const allProductsFlat: SwapItem[] = Object.values(catalog).flat();
+  const norm = (s: string) => s.toLowerCase().trim();
+  const q = norm(searchQuery);
+  if (q) {
+    filteredItems = allProductsFlat.filter((p) => norm(p.title).includes(q));
+  }
+
   filteredItems = [...filteredItems].sort((a, b) => {
     if (sortOption === "newest")
       return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
@@ -303,7 +312,7 @@ function SwapCatalogContent() {
         
                       {/* Search bar (hidden on xs, expands on sm+) */}
                       <div className="hidden sm:flex flex-1 mx-3 sm:mx-6">
-                        <div className="flex items-center gap-3 bg-gray-100 rounded-full px-4 sm:px-5 h-9 w-full">
+                        <div className="relative flex items-center gap-3 bg-gray-100 rounded-full px-4 sm:px-5 h-9 w-full">
                           <svg
                             className="w-4 h-4 text-gray-500"
                             viewBox="0 0 24 24"
@@ -315,8 +324,75 @@ function SwapCatalogContent() {
                           </svg>
                           <input
                             className="bg-transparent outline-none text-sm flex-1"
-                            placeholder="Search"
+                            placeholder="Search by category or title"
+                            value={searchQuery}
+                            onChange={(e) => {
+                              setSearchQuery(e.target.value);
+                              setShowSuggestions(true);
+                            }}
+                            onFocus={() => setShowSuggestions(true)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                const matchCat = categories
+                                  .filter(Boolean)
+                                  .find((c) => c.toLowerCase() === q);
+                                if (matchCat) {
+                                  setShowSuggestions(false);
+                                  setSearchQuery("");
+                                  handleCategoryClick(matchCat);
+                                } else {
+                                  setShowSuggestions(false);
+                                }
+                              }
+                              if (e.key === 'Escape') setShowSuggestions(false);
+                            }}
                           />
+                          {showSuggestions && q && (
+                            <div className="absolute left-0 top-full mt-2 w-full bg-white rounded-xl shadow-lg border border-gray-200 z-50">
+                              <ul className="max-h-72 overflow-auto py-2 text-sm">
+                                {categories
+                                  .filter((c) => c && c !== 'ALL')
+                                  .filter((c) => c.toLowerCase().includes(q))
+                                  .slice(0, 5)
+                                  .map((c) => (
+                                    <li key={`cat-${c}`}>
+                                      <button
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-50"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          setShowSuggestions(false);
+                                          setSearchQuery("");
+                                          handleCategoryClick(c);
+                                        }}
+                                      >
+                                        Category: {c}
+                                      </button>
+                                    </li>
+                                  ))}
+                                {allProductsFlat
+                                  .filter((p) => norm(p.title).includes(q))
+                                  .slice(0, 8)
+                                  .map((p) => (
+                                    <li key={`title-${p.id}`}>
+                                      <button
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-50"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          setShowSuggestions(false);
+                                          setSearchQuery(p.title);
+                                        }}
+                                      >
+                                        {p.title}
+                                      </button>
+                                    </li>
+                                  ))}
+                                {categories.filter((c) => c && c !== 'ALL' && c.toLowerCase().includes(q)).length === 0 &&
+                                  allProductsFlat.filter((p) => norm(p.title).includes(q)).length === 0 && (
+                                    <li className="px-4 py-2 text-gray-500">No results</li>
+                                  )}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       </div>
         
