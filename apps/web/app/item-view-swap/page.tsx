@@ -92,6 +92,8 @@ export default function ItemViewSwapPage() {
   const [relatedSaleProducts, setRelatedSaleProducts] = useState<SaleProduct[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load product and related products
   useEffect(() => {
@@ -375,15 +377,23 @@ export default function ItemViewSwapPage() {
                 <button
                   onClick={async () => {
                     if (!isAuthenticated) {
-                      alert('Please login to initiate a swap');
+                      setToast({ type: 'error', message: 'Please login to initiate a swap' });
+                      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+                      toastTimerRef.current = setTimeout(() => setToast(null), 1800);
                       return;
                     }
                     try {
                       await createSwap(currentSwapProduct.id, `Interested to swap for: ${currentSwapProduct.wantItem}`);
-                      alert('A message was sent to the seller');
-                      window.location.href = '/cart-details/swap';
+                      setToast({ type: 'success', message: 'A message was sent to the seller' });
+                      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+                      toastTimerRef.current = setTimeout(() => {
+                        setToast(null);
+                        window.location.href = '/cart-details/swap';
+                      }, 1200);
                     } catch (e) {
-                      alert('Failed to create swap. Please try again.');
+                      setToast({ type: 'error', message: 'Failed to create swap. Please try again.' });
+                      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+                      toastTimerRef.current = setTimeout(() => setToast(null), 1800);
                     }
                   }}
                   className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-(--color-olive) text-white rounded-full font-medium hover:bg-(--color-primary) transition-colors text-sm sm:text-base"
@@ -481,6 +491,31 @@ export default function ItemViewSwapPage() {
           </div>
         </footer>
       </main>
+      {/* Themed Toast Notification */}
+      {toast && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className={`min-w-[260px] max-w-sm px-4 py-3 rounded-xl shadow-xl ring-1 ring-black/10 bg-white flex items-start gap-3 border-l-4 ${toast.type === 'success' ? 'border-l-(--color-olive)' : 'border-l-red-500'}`}>
+            <div className={`mt-0.5 rounded-full p-1 ${toast.type === 'success' ? 'bg-(--color-olive)/10 text-(--color-olive)' : 'bg-red-100 text-red-600'}`}>
+              {toast.type === 'success' ? (
+                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.5 7.5a1 1 0 01-1.414 0l-3-3a1 1 0 111.414-1.414L8.5 12.086l6.793-6.793a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+              ) : (
+                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-5a1 1 0 112 0 1 1 0 01-2 0zm.293-7.707a1 1 0 011.414 0l.007.007a1 1 0 01.286.704l-.2 5a1 1 0 11-1.998-.08l.2-5a1 1 0 01.291-.631z" clipRule="evenodd"/></svg>
+              )}
+            </div>
+            <div className="flex-1">
+              <p className={`text-sm font-medium ${toast.type === 'success' ? 'text-(--color-olive)' : 'text-red-700)'}`.replace(')', '')}>{toast.type === 'success' ? 'Success' : 'Notice'}</p>
+              <p className="text-sm text-neutral-700 mt-0.5">{toast.message}</p>
+            </div>
+            <button
+              aria-label="Dismiss"
+              onClick={() => setToast(null)}
+              className="ml-2 text-neutral-400 hover:text-neutral-600"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Chat Bubble */}
       <ChatBubble 
