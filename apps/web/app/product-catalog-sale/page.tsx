@@ -540,7 +540,7 @@ function ChairsCatalogContent() {
                 </Link>
 
                 <Link
-                  href="/seller-dashboard"
+                  href="/profile/seller-dashboard-access"
                   className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100/70"
                   onClick={() => setMenuOpen(false)}
                 >

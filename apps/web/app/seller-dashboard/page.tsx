@@ -643,15 +643,15 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                         imageFormData.append('image', imageFile);
                         
                         try {
-                        const uploadRes = await fetch(`${API_BASE_URL}/api/products/upload-image`, {
-                            method: 'POST',
-                            headers: { Authorization: `Bearer ${token}` },
-                            body: imageFormData,
-                        });
-                        
-                        if (uploadRes.ok) {
-                            const uploadData = await uploadRes.json();
-                            uploadedImages.push(uploadData.secure_url);
+                            const uploadRes = await fetch(`${API_BASE_URL}/api/products/upload-image`, {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${token}` },
+                                body: imageFormData,
+                            });
+                            
+                            if (uploadRes.ok) {
+                                const uploadData = await uploadRes.json();
+                                uploadedImages.push(uploadData.secure_url);
                                 console.log('Image uploaded successfully:', uploadData.secure_url);
                             } else {
                                 const errorData = await uploadRes.json().catch(() => ({}));
@@ -930,7 +930,7 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                             <p className="text-green-600 text-sm font-medium">Total Revenue</p>
                             <p className="text-3xl font-bold text-green-900 transition-all duration-300">₱{totalSoldValue.toLocaleString()}</p>
                             <p className="text-green-600 text-xs mt-1">From {soldProducts} sales</p>
-            </div>
+                            </div>
                         <div className="w-12 h-12 bg-green-200 rounded-xl flex items-center justify-center">
                             <DollarSign className="w-6 h-6 text-green-600" />
                             </div>
@@ -946,9 +946,9 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                             </div>
                         <div className="w-12 h-12 bg-blue-200 rounded-xl flex items-center justify-center">
                             <Package className="w-6 h-6 text-blue-600" />
-                            </div>
                         </div>
                     </div>
+                            </div>
                     
                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 border border-purple-200 shadow-sm transition-all duration-300">
                     <div className="flex items-center justify-between">
@@ -975,10 +975,10 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                         <div className="w-12 h-12 bg-orange-200 rounded-xl flex items-center justify-center">
                             <TrendingUp className="w-6 h-6 text-orange-600" />
                             </div>
-                            </div>
                         </div>
                     </div>
-                    
+                </div>
+                
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Sales Trend Chart */}
@@ -1053,8 +1053,8 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                                 <Legend />
                             </RechartsPieChart>
                         </ResponsiveContainer>
-                        </div>
                     </div>
+                </div>
             </div>
 
             {/* Category Performance & Recent Activity */}
@@ -1116,9 +1116,9 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
             <div>
                                     <p className="text-sm font-medium text-green-800">Live Products</p>
                                     <p className="text-2xl font-bold text-green-900">{approvedProducts}</p>
-            </div>
+                            </div>
+                        </div>
                     </div>
-            </div>
                     
                         <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-xl border border-yellow-200">
                             <div className="flex items-center space-x-3">
@@ -1154,8 +1154,8 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                                 <div>
                                     <p className="text-sm font-medium text-purple-800">Added This Week</p>
                                     <p className="text-2xl font-bold text-purple-900">{recentProducts}</p>
-            </div>
-        </div>
+                                        </div>
+                                    </div>
                         </div>
                     </div>
                 </div>
@@ -1611,19 +1611,19 @@ const SellerDashboardPage: React.FC<SellerDashboardProps> = ({ embedded = false 
                         <div className="px-4 sm:px-6 lg:px-8 py-4">
                             <div className="w-full max-w-[1200px] mx-auto">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{shopName}'s Dashboard</h1>
-                                    <div className="flex items-center space-x-4">
-                                        <div className="text-sm text-gray-500">
+                                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{shopName}'s Dashboard</h1>
+                                        <div className="flex items-center space-x-4">
+                                            <div className="text-sm text-gray-500">
                                             Last updated: {lastRefresh ? lastRefresh.toLocaleTimeString() : 'Loading...'}
+                                            </div>
+                                            <button
+                                                onClick={refreshSellerData}
+                                                className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
+                                            >
+                                                Refresh Data
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={refreshSellerData}
-                                            className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
-                                        >
-                                            Refresh Data
-                                        </button>
                                     </div>
-                                </div>
                                     {renderSellerNavbar()}
                             </div>
                         </div>

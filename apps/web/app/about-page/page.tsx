@@ -127,7 +127,7 @@ const AboutPage = () => {
       </button>
 
       <div className="flex min-h-screen bg-gray-50">
-        <div className="flex-1 ml-0 md:ml-[300px] w-full">
+        <div className="flex-1 ml-0 w-full">
           <div className="pt-16 px-4 sm:px-6 lg:px-8">
          
           {/* Main Content */}
